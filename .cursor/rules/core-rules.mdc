@@ -1,0 +1,21 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+#Project Summary
+- Create a reusable Unity WebGL plugin that adds wallet-based sign-in capability.
+- Designed to be installed via the Unity Package Manager.
+
+#Packaging
+- Distributed as a standalone package (UPM).
+- Includes metadata for Package Manager discovery and updates.
+
+#Samples
+- Provides importable Samples (via Package Manager → Samples) that demonstrate basic setup and usage.
+- Samples include a minimal scene and template to verify the integration end-to-end.
+
+#Deliverables
+- Core runtime and editor components required for WebGL integration.
+- Brief setup guide included in the package.
