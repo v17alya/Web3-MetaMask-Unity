@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Samples/Minimal/Scenes/MinimalSample.unity
+    path: Assets/Web3MetaMask/Samples/Minimal/Scenes/MinimalSample.unity
     guid: 341ca98d67ae645bba5456aa6766b602
   m_configObjects: {}
