@@ -229,6 +229,6 @@ Lifecycle control note: You may perform init/connect/sign/request from JavaScrip
 
 ## References
 - MetaMask SDK docs: https://docs.metamask.io/sdk/connect/javascript/
-- Minimal sample README: https://github.com/v17alya/Web3-MetaMask-Unity/Assets/com.gamenator.web3-metamask-unity/Samples/Minimal/README.md
-- Unity plugin README: https://github.com/v17alya/Web3-MetaMask-Unity/Assets/com.gamenator.web3-metamask-unity/README.md
+- Minimal sample README: https://github.com/v17alya/Web3-MetaMask-Unity/tree/main/Assets/Web3MetaMask/Samples/Minimal/Documentation/README.md
+- Unity plugin README: https://github.com/v17alya/Web3-MetaMask-Unity/tree/main/Assets/com.gamenator.web3-metamask-unity/README.md
  
