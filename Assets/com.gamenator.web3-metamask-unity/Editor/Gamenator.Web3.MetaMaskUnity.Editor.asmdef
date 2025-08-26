@@ -1,0 +1,18 @@
+{
+    "name": "Gamenator.Web3.MetaMaskUnity.Editor",
+    "rootNamespace": "Gamenator.Web3.MetaMaskUnity",
+    "references": [
+        "Gamenator.Web3.MetaMaskUnity"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
