@@ -1,7 +1,7 @@
 {
   "name": "com.gamenator.web3-metamask-unity",
   "displayName": "MetaMask Unity",
-  "version": "0.2.0",
+  "version": "0.1.1",
   "unity": "2021.3",
   "description": "Unity WebGL plugin that integrates MetaMask SDK and provides an Editor installer, WebGL bridge, and a minimal sample.",
   "keywords": ["web3", "wallet", "metamask", "webgl", "ethereum"],
@@ -20,7 +20,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "documentationUrl": "Documentation/Setup.md",
+  "documentationUrl": "README.md",
   "changelogUrl": "CHANGELOG.md",
   "licensesUrl": "../../LICENSE",
   "samples": [
