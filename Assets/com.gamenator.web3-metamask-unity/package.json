@@ -27,7 +27,7 @@
     {
       "displayName": "Minimal",
       "description": "Minimal WebGL template and MonoBehaviour to validate the MetaMask bridge end-to-end.",
-      "path": "Samples/Minimal"
+      "path": "Samples~/Minimal"
     }
   ],
   "dependencies": {}
