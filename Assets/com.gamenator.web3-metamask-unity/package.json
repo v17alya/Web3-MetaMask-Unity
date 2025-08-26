@@ -1,0 +1,34 @@
+{
+  "name": "com.gamenator.web3-metamask-unity",
+  "displayName": "MetaMask Unity",
+  "version": "0.1.0",
+  "unity": "2021.3",
+  "description": "Unity WebGL plugin that integrates MetaMask SDK and provides an Editor installer, WebGL bridge, and a minimal sample.",
+  "keywords": ["web3", "wallet", "metamask", "webgl", "ethereum"],
+  "author": {
+    "name": "Gamenator"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/v17alya/Web3-MetaMask-Unity.git"
+  },
+  "homepage": "https://github.com/v17alya/Web3-MetaMask-Unity#readme",
+  "bugs": {
+    "url": "https://github.com/v17alya/Web3-MetaMask-Unity/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "documentationUrl": "README.md",
+  "changelogUrl": "CHANGELOG.md",
+  "licensesUrl": "../../LICENSE",
+  "samples": [
+    {
+      "displayName": "Minimal",
+      "description": "Minimal WebGL template and MonoBehaviour to validate the MetaMask bridge end-to-end.",
+      "path": "Samples~/Minimal"
+    }
+  ],
+  "dependencies": {}
+}

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <style>
+      #controls { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; background: rgba(12,14,22,0.92); padding: 12px; border-bottom: 1px solid #3b4160; box-shadow: 0 6px 16px rgba(0,0,0,0.35); transform: translateY(0); transition: transform .22s ease; }
+      #controls.collapsed { transform: translateY(-110%); pointer-events: none; }
+      #controls .group { display: flex; flex-direction: column; gap: 6px; }
+      #controls label { font: 12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu; color: #b9c0ff; }
+      #controls input, #controls textarea { width: 100%; box-sizing: border-box; background: #1e2235; color: #e8eaff; border: 1px solid #3b4160; border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+      #controls textarea { min-height: 58px; resize: vertical; }
+      #controls button { background: #2a2f45; border: 1px solid #3b4160; color: #e8eaff; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+      #controls button:hover { background: #363d5a; }
+      #controls-toggle { position: fixed; top: 8px; right: 8px; z-index: 11; background: #2a2f45; border: 1px solid #3b4160; color: #e8eaff; padding: 6px 10px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+      #controls.collapsed + #controls-toggle { top: 8px; }
+    </style>
+    <script src="src/web3-metamask/web3-metamask-bridge.js"></script>
+  </head>
+  <body class="{{{ SPLASH_SCREEN_STYLE.toLowerCase() }}}">
+    <!-- ============================================================= -->
+    <!-- MetaMask Sample Controls (Guide)                              -->
+    <!-- - Fill Init options (Infura key, dapp metadata)               -->
+    <!-- - Click Init, then Connect                                    -->
+    <!-- - Use Sign / Request / ConnectWith to test flows              -->
+    <!-- ============================================================= -->
+    <div id="controls">
+      <div class="group">
+        <!-- Init & Session -->
+        <label>Infura API Key</label>
+        <input id="infura" placeholder="YOUR_INFURA_KEY" />
+        <label>Dapp Name</label>
+        <input id="dappName" placeholder="Unity Web3 MetaMask" />
+        <label>Dapp URL</label>
+        <input id="dappUrl" placeholder="https://example.com" />
+        <button onclick="doInit()">Init</button>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnectAll()">Disconnect</button>
+        <button onclick="pasteClipboardToUnity()">Paste clipboard → Unity</button>
+      </div>
+      <div class="group">
+        <!-- Signing & JSON-RPC Request -->
+        <label>Message to sign</label>
+        <input id="msg" placeholder="Hello from HTML" />
+        <button onclick="sign()">Sign message</button>
+        <button onclick="connectAndSign()">Connect + Sign</button>
+        <label>Request method</label>
+        <input id="rpcMethod" placeholder="eth_chainId" />
+        <label>Request params (JSON)</label>
+        <textarea id="rpcParams" placeholder='["0x..."]'></textarea>
+        <button onclick="requestRpc()">Request</button>
+      </div>
+      <div class="group">
+        <!-- connectWith (connect + specific RPC) & Diagnostics -->
+        <label>connectWith method</label>
+        <input id="cwMethod" placeholder="eth_getBalance" />
+        <label>connectWith params (JSON)</label>
+        <textarea id="cwParams" placeholder='["0x..."]'></textarea>
+        <button onclick="connectWithRpc()">ConnectWith</button>
+        <button onclick="checkInitialized()">IsInitialized?</button>
+      </div>
+    </div>
+    <button id="controls-toggle" onclick="togglePanel()">Hide Panel</button>
+
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas"></canvas>
+    </div>
+    <div id="loading-cover" style="display:none;">
+      <div id="unity-loading-bar">
+        <div id="unity-logo"><img src="logo.png"></div>
+        <div id="unity-progress-bar-empty" style="display: none;">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+        <div class="spinner"></div>
+      </div>
+    </div>
+    <div id="unity-fullscreen-button" style="display: none;"></div>
+
+    <!-- MetaMask: helpers and quick-start flows -->
+    <script>
+      // -------------------------------------------------------------
+      // MetaMask Sample – Helper functions (button actions)
+      // -------------------------------------------------------------
+
+      // Web3BridgeSample is the GameObject name in Unity that is connected to the JS bridge
+      const gameObjectName = "Web3BridgeSample";
+
+      // Collapsible panel logic
+      function togglePanel() {
+        const panel = document.getElementById('controls');
+        const btn = document.getElementById('controls-toggle');
+        const collapsed = panel.classList.toggle('collapsed');
+        btn.textContent = collapsed ? 'Show Panel' : 'Hide Panel';
+        try { localStorage.setItem('mmPanelCollapsed', collapsed ? '1' : '0'); } catch {}
+      }
+      (function restorePanelState(){ try { const v = localStorage.getItem('mmPanelCollapsed'); if (v === '1') { const panel = document.getElementById('controls'); panel.classList.add('collapsed'); const btn = document.getElementById('controls-toggle'); btn.textContent = 'Show Panel'; } } catch {} })();
+      /**
+       * Initialize MetaMaskBridge with user-provided options.
+       * Recommendation: set your Infura key and recognizable dapp metadata.
+       */
+      function doInit() {
+        const infura = document.getElementById('infura').value.trim();
+        const dappName = document.getElementById('dappName').value.trim() || 'Unity Web3 MetaMask';
+        const dappUrl = document.getElementById('dappUrl').value.trim() || window.location.href;
+        try {
+          MetaMaskBridge.init({
+            dappMetadata: { name: dappName, url: dappUrl },
+            infuraAPIKey: infura,
+            debug: true,
+            unity: {
+              gameObjectName: gameObjectName
+            }
+          });
+        } catch (e) { console.error('Bridge init error:', e); }
+      }
+      /** Start/stop a wallet session */
+      function connect() { try { MetaMaskBridge.connect(); } catch (e) { console.error(e); } }
+      function disconnectAll() { try { MetaMaskBridge.disconnect(); } catch (e) { console.error(e); } }
+      /** Sign an arbitrary message with the connected account */
+      function sign() { const m = document.getElementById('msg').value || 'Hello from HTML'; try { MetaMaskBridge.signMessage(m); } catch (e) { console.error(e); } }
+      /** Connect (if needed) and sign a message in one step (SDK-supported) */
+      function connectAndSign() { const m = document.getElementById('msg').value || 'Hello from HTML'; try { MetaMaskBridge.connectAndSign(m); } catch (e) { console.error(e); } }
+      /**
+       * Perform an arbitrary JSON-RPC request.
+       * Example: method: eth_chainId, params: [] or omitted
+       */
+      function requestRpc() {
+        const m = (document.getElementById('rpcMethod').value || '').trim();
+        const ptxt = document.getElementById('rpcParams').value.trim();
+        let params = undefined; if (ptxt) { try { params = JSON.parse(ptxt); } catch (e) { alert('Invalid JSON in Request params'); return; } }
+        try { MetaMaskBridge.request(m, params); } catch (e) { console.error(e); }
+      }
+      /**
+       * Connect (if needed) and perform a specific JSON-RPC method.
+       * Useful when a method must be executed right after connection.
+       */
+      function connectWithRpc() {
+        const m = (document.getElementById('cwMethod').value || '').trim();
+        const ptxt = document.getElementById('cwParams').value.trim();
+        let params = undefined; if (ptxt) { try { params = JSON.parse(ptxt); } catch (e) { alert('Invalid JSON in connectWith params'); return; } }
+        try { MetaMaskBridge.connectWith({ method: m, params }); } catch (e) { console.error(e); }
+      }
+      /** Diagnostic utility to check if the bridge has been initialized */
+      function checkInitialized() { try { const ok = MetaMaskBridge.isInitialized(); console.log('[MetaMaskBridge] isInitialized:', ok); alert('isInitialized: ' + ok); } catch (e) { console.error(e); } }
+
+      /**
+       * Read text from browser clipboard and forward to Unity clipboard via SendMessage.
+       * Requires user gesture and secure context (HTTPS) in most browsers.
+       */
+      function pasteClipboardToUnity() {
+        try {
+          if (!navigator.clipboard || !navigator.clipboard.readText) { alert('Clipboard API not available'); return; }
+          navigator.clipboard.readText().then(function(text){
+            try {
+              var u = window.unityInstance;
+              if (!u || typeof u.SendMessage !== 'function') { alert('Unity instance not ready'); return; }
+              u.SendMessage(gameObjectName, 'OnClipboardFromHtml', String(text || ''));
+            } catch (e) { console.error('SendMessage failed', e); }
+          }).catch(function(err){ alert('Clipboard read failed: ' + (err && err.message ? err.message : err)); });
+        } catch (e) { console.error(e); }
+      }
+    </script>
+
+    <!-- Unity loader (kept separate from MetaMask helpers for clarity) -->
+    <script>
+      // Unity loader
+      const hideFullScreenButton = "{{{ HIDE_FULL_SCREEN_BUTTON }}}";
+      const buildUrl = "Build";
+      const loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
+      const config = {
+        dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+        frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+        #if USE_THREADS
+        workerUrl: buildUrl + "/{{{ WORKER_FILENAME }}}",
+        #endif
+        #if USE_WASM
+        codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+        #endif
+        #if MEMORY_FILENAME
+        memoryUrl: buildUrl + "/{{{ MEMORY_FILENAME }}}",
+        #endif
+        #if SYMBOLS_FILENAME
+        symbolsUrl: "{{{ SYMBOLS_FILENAME }}}",
+        #endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "{{{ COMPANY_NAME }}}",
+        productName: "{{{ PRODUCT_NAME }}}",
+        productVersion: "{{{ PRODUCT_VERSION }}}",
+      };
+
+      const container = document.querySelector("#unity-container");
+      const canvas = document.querySelector("#unity-canvas");
+      const loadingCover = document.querySelector("#loading-cover");
+      const progressBarEmpty = document.querySelector("#unity-progress-bar-empty");
+      const progressBarFull = document.querySelector("#unity-progress-bar-full");
+      const fullscreenButton = document.querySelector("#unity-fullscreen-button");
+      const spinner = document.querySelector('.spinner');
+
+      const canFullscreen = (function() {
+        for (const key of [
+            'exitFullscreen', 'webkitExitFullscreen', 'webkitCancelFullScreen', 'mozCancelFullScreen', 'msExitFullscreen',
+          ]) {
+          if (key in document) return true;
+        }
+        return false;
+      }());
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        container.className = "unity-mobile";
+        config.devicePixelRatio = 1;
+      }
+      loadingCover.style.display = "";
+
+      const script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          spinner.style.display = "none";
+          progressBarEmpty.style.display = "";
+          progressBarFull.style.width = `${100 * progress}%`;
+        }).then((unityInstance) => {
+          loadingCover.style.display = "none";
+          if (canFullscreen) {
+            if (!hideFullScreenButton) {
+              fullscreenButton.style.display = "";
+            }
+            fullscreenButton.onclick = () => unityInstance.SetFullscreen(1);
+          }
+          window.unityInstance = unityInstance;
+          // Wire Unity instance to bridge
+          try { 
+            MetaMaskBridge.setUnityGameObjectName(gameObjectName);
+            MetaMaskBridge.setUnityInstance({ instance: unityInstance }); 
+          } catch (e) { console.warn('setUnityInstance failed', e); }
+        }).catch((message) => {
+          alert(message);
+        });
+      };
+      document.body.appendChild(script);
+    </script>
+  </body>
+  </html>

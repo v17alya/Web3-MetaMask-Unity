@@ -1,0 +1,17 @@
+{
+    "name": "Gamenator.Web3.MetaMaskUnity",
+    "rootNamespace": "Gamenator.Web3.MetaMaskUnity",
+    "references": [],
+    "includePlatforms": [
+        "Editor",
+        "WebGL"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
