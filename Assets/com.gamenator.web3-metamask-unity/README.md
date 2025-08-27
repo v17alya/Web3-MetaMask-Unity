@@ -6,8 +6,10 @@ Unity WebGL plugin that integrates MetaMask SDK and exposes a JavaScript bridge 
 - Editor installer to unpack embedded bridge payload into `Assets/StreamingAssets/MetaMask`
 - JavaScript bridge (`window.MetaMaskBridge`) with:
   - `init`, `connect`, `disconnect`, `signMessage`, `request`
-  - `connectAndSign`, `connectWith`, `isInitialized`
+  - `connectAndSign`, `connectWith`, `isInitialized`, `isConnected`
+  - `getConnectionState`, `getConnectionDetails`
   - `setUnityInstance`, `setUnityGameObjectName`, `setDebug`
+  - `on(event, handler)`, `off(event, handler?)`
   - etc.
 - C# interop: `.jslib` + `Web3MetaMaskJsBridge` wrapper (methods mirror the JS API)
 - Sample (`Minimal`) with WebGL template and a sample MonoBehaviour
@@ -53,6 +55,15 @@ Choose one of the following:
       // Optionally pass callback GameObject and/or Unity instance (if available here)
       // unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
       debug: false
+      // Optional JS-side events (you can also use MetaMaskBridge.on/off later)
+        disconnected: () => console.log('disconnected'),
+        chainChanged: (cid) => console.log('chainChanged', cid),
+        signed: ({ signature, address }) => console.log('signed', signature, address),
+        requestError: (m) => console.warn('requestError', m),
+        // Connection details emits
+        connectionDetails: (res) => console.log('connectionDetails', res),
+        connectionDetailsError: (m) => console.warn('connectionDetailsError', m)
+      }
     });
   </script>
 </head>
@@ -95,6 +106,11 @@ Web3MetaMaskJsBridge.ConnectWith("eth_getBalance", "[\"0x...\", \"latest\"]");
 
 // Optional: set target GameObject name for callbacks
 Web3MetaMaskJsBridge.SetUnityGameObjectName(gameObject.name);
+
+// Optional (diagnostics):
+bool isConnected = Web3MetaMaskJsBridge.IsConnected(); // bool
+var state = Web3MetaMaskJsBridge.GetConnectionState();  // { connected, address }
+Web3MetaMaskJsBridge.GetConnectionDetails();            // emits OnConnectionDetails/OnConnectionDetailsError
 ```
 - Unity callbacks you can implement on the same GameObject:
 ```csharp
@@ -109,6 +125,8 @@ void OnSignError(string error) { }
 void OnRequestedError(string error) { }
 void OnConnectedWithError(string error) { }
 void OnChainChanged(string chainId) { /* react to network changes */ }
+void OnConnectionDetails(string json) { /* read { success, result?: { connected, address, accounts, chainId }, error? } */ }
+void OnConnectionDetailsError(string error) { }
 ```
 
 4) Build & run (WebGL)
@@ -131,9 +149,13 @@ void OnChainChanged(string chainId) { /* react to network changes */ }
 - `signMessage(message)` — signs a message via `personal_sign`
 - `request({ method, params? })` — arbitrary JSON-RPC
 - `isInitialized()` — returns whether the SDK is initialized
+- `isConnected()` — whether an address is cached as connected
+- `getConnectionState()` — returns `{ connected, address }`
+- `getConnectionDetails()` — Promise resolving `{ success, result?: { connected, address, accounts, chainId }, error?: string }`
 - `setUnityInstance({ instance? })`
 - `setUnityGameObjectName(name)` — set callback target GameObject name
 - `setDebug(enabled)` — enable verbose logging in the bridge
+- `on(event, handler)` / `off(event, handler?)`
 
 Lifecycle control (choose what suits your project):
 - JavaScript‑driven: call `MetaMaskBridge.init(...)` in your template JS and use `MetaMaskBridge.connect()/signMessage()/request()` directly from the page.
@@ -149,6 +171,7 @@ Unity callbacks (GameObject default is `Web3Bridge`):
 - `OnConnectedWith(json)` / `OnConnectedWithError(error)`
 - `OnConnectError(error)` / `OnDisconnectError(error)`
 - `OnChainChanged(chainId)`
+- `OnConnectionDetails(json)` / `OnConnectionDetailsError(error)`
 
 ## Editor Utilities
 - Tools → Web3 → MetaMask → Install Embedded Bridge

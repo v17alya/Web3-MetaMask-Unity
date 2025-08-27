@@ -158,7 +158,20 @@ Include the script in your template index.html (ensure it's loaded before any co
       infuraAPIKey: 'YOUR_INFURA_KEY',
       // Unity wiring (optional): callback GameObject and/or Unity instance if available
       // unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
-      debug: false
+      debug: false,
+      // Optional JS-side events (you can also use MetaMaskBridge.on/off)
+      events: {
+        connected: ({ address, accounts }) => console.log('connected', address, accounts),
+        disconnected: () => console.log('disconnected'),
+        chainChanged: (cid) => console.log('chainChanged', cid),
+        signed: ({ signature, address }) => console.log('signed', signature, address),
+        requested: (result) => console.log('requested', result),
+        connectError: (m) => console.warn('connectError', m),
+        requestError: (m) => console.warn('requestError', m),
+        // Connection detail emits
+        connectionDetails: (res) => console.log('connectionDetails', res),
+        connectionDetailsError: (m) => console.warn('connectionDetailsError', m)
+      }
     });
   </script>
 </head>
@@ -192,9 +205,16 @@ See the MetaMask SDK docs for details: https://docs.metamask.io/sdk/connect/java
 - `window.MetaMaskBridge.signMessage(message)`
 - `window.MetaMaskBridge.request({ method, params? })`
 - `window.MetaMaskBridge.isInitialized()`
+- `window.MetaMaskBridge.isConnected()`
+- `window.MetaMaskBridge.getConnectionState()` → `{ connected, address }`
+- `window.MetaMaskBridge.getConnectionDetails()` → `{ success, result?: { connected, address, accounts, chainId }, error?: string }`
 - `window.MetaMaskBridge.setUnityInstance({ instance? } | instance)`
 - `window.MetaMaskBridge.setUnityGameObjectName(name)`
 - `window.MetaMaskBridge.setDebug(enabled)`
+- `window.MetaMaskBridge.on(event, handler)` / `off(event, handler?)`
+
+Notes:
+- Provider object is not returned (non-serializable); use `request({...})` for RPC and `on('chainChanged'|...)` for events.
 
 ## Unity callbacks (GameObject: default `Web3Bridge`)
 - `OnConnected(string address)` / `OnDisconnected(string empty)`
@@ -203,6 +223,7 @@ See the MetaMask SDK docs for details: https://docs.metamask.io/sdk/connect/java
 - `OnConnectedWith(string json)` / `OnConnectedWithError(string message)`
 - `OnConnectError(string message)` / `OnDisconnectError(string message)`
 - `OnChainChanged(string chainId)`
+- `OnConnectionDetails(string json)` / `OnConnectionDetailsError(string message)`
 
 ## C# interop (optional)
 You can call the same functionality from Unity using the `.jslib` wrapper:
