@@ -23,6 +23,12 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	let lastAddress = "";
 	/** @type {boolean} Verbose debug logging */
 	let debug = false;
+	/** @type {Record<string, Function[]>} JS-side event handlers */
+	let jsEventHandlers = {};
+	/** @type {boolean} Deduplication state for connection emits to avoid double-calling when multiple sources trigger the same state. */
+	let lastEmittedIsConnected = false;
+	/** @type {string} Deduplication state for connection emits to avoid double-calling when multiple sources trigger the same state. */
+	let lastEmittedAddress = "";
 
 	// ---------------------------------------------------------------------------
 	// Public API (MetaMask SDK lifecycle and RPC)
@@ -40,6 +46,22 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 *        Required API key enabling read‑only RPC and load‑balancing
 	 * @param {{ instance?: any; gameObjectName?: string }} [options.unity]
 	 *        Unity wiring: explicit instance and/or callback GameObject name
+	 * @param {{
+	 *    connected?: (payload: { address: string; accounts?: string[] }) => void,
+	 *    disconnected?: () => void,
+	 *    chainChanged?: (chainId: string) => void,
+	 *    signed?: (payload: { signature: string; address?: string }) => void,
+	 *    requested?: (result: any) => void,
+	 *    connectedWith?: (result: any) => void,
+	 *    connectError?: (message: string) => void,
+	 *    disconnectError?: (message: string) => void,
+	 *    signError?: (message: string) => void,
+	 *    requestError?: (message: string) => void,
+	 *    connectedWithError?: (message: string) => void,
+	 * }} [options.events]
+	 *        Optional JS-side event callbacks. You can also pass top-level
+	 *        onConnected/onDisconnected/onChainChanged/onSigned/onRequested
+	 *        and corresponding *Error callbacks.
 	 * @param {boolean} [options.debug]
 	 *        Enable verbose debug logging
 	 * @param {boolean} [options.checkInstallationImmediately]
@@ -75,6 +97,27 @@ import { MetaMaskSDK } from "@metamask/sdk";
 				setUnityGameObjectName(String(options.unity.gameObjectName));
 			if (options.unity?.instance) unityInstance = options.unity.instance;
 			log("Unity wiring", { unityGameObjectName, hasInstance: Boolean(unityInstance) });
+			// JS event wiring from init options
+			try {
+				const ev = /** @type {any} */ (options.events || {});
+				const direct = /** @type {any} */ (options || {});
+				const map = [
+					["connected", ev.connected || direct.onConnected],
+					["disconnected", ev.disconnected || direct.onDisconnected],
+					["chainChanged", ev.chainChanged || direct.onChainChanged],
+					["signed", ev.signed || direct.onSigned],
+					["requested", ev.requested || direct.onRequested],
+					["connectedWith", ev.connectedWith || direct.onConnectedWith],
+					["connectError", ev.connectError || direct.onConnectError],
+					["disconnectError", ev.disconnectError || direct.onDisconnectError],
+					["signError", ev.signError || direct.onSignError],
+					["requestError", ev.requestError || direct.onRequestedError],
+					["connectedWithError", ev.connectedWithError || direct.onConnectedWithError],
+				];
+				for (const [eventName, handler] of map) {
+					if (typeof handler === "function") on(String(eventName), handler);
+				}
+			} catch {}
 			
 			
 			const dappMetadata = options.dappMetadata;
@@ -126,7 +169,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			if (!addr) throw new Error("No address");
 			lastAddress = addr;
 			log("connect success:", { addr, count: accounts.length });
-			sendToUnity("OnConnected", addr);
+			emitConnected(addr, accounts);
 			// Ensure provider is current and subscribe events
 			provider = getProvider() || provider;
 			if (!subscribeProviderEvents(provider)) {
@@ -162,10 +205,10 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			}
 			if (result?.accounts?.length) {
 				lastAddress = String(result.accounts[0]);
-				sendToUnity("OnConnected", lastAddress);
+				emitConnected(lastAddress, result.accounts);
 			}
 			log("connectAndSign success:", { addr: lastAddress, hasSignature: Boolean(result?.signature) });
-			sendToUnity("OnSigned", String(result?.signature ?? ""));
+			emitSigned(String(result?.signature ?? ""), lastAddress);
 			return { success: true, result };
 		} catch (e) {
 			error("connectAndSign error:", e?.message || e);
@@ -188,7 +231,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			}
 			const result = await sdk.connectWith(rpc);
 			log("connectWith success");
-			sendToUnity("OnConnectedWith", JSON.stringify(result));
+			emitConnectedWith(result);
 			return { success: true, result };
 		} catch (e) {
 			error("connectWith error:", e?.message || e);
@@ -207,7 +250,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			log("disconnect called");
 			lastAddress = "";
 			if (sdk?.terminate) await sdk.terminate();
-			sendToUnity("OnDisconnected", "");
+			emitDisconnected();
 			return { success: true, result: "" };
 		} catch (e) {
 			error("disconnect error:", e?.message || e);
@@ -222,6 +265,40 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 */
 	function isInitialized() {
 		try { return Boolean(sdk && sdk.isInitialized && sdk.isInitialized()); } catch { return Boolean(sdk); }
+	}
+
+	/**
+	 * Check if there is a cached connected address.
+	 * @returns {boolean}
+	 */
+	function isConnected() {
+		return Boolean(lastAddress);
+	}
+
+	/**
+	 * Get cached connection state synchronously.
+	 * @returns {{ connected: boolean, address: string }}
+	 */
+	function getConnectionState() {
+		// Return only serializable fields to avoid circular JSON errors
+		return { connected: Boolean(lastAddress), address: String(lastAddress || "") };
+	}
+
+	/**
+	 * Query provider for up-to-date connection details.
+	 * @returns {Promise<{ success: true, result: { connected: boolean, address: string, accounts: string[], chainId: string | null } } | { success: false, error: string }>}
+	 */
+	async function getConnectionDetails() {
+		try {
+			const p = getProvider();
+			const accounts = p ? await p.request({ method: "eth_accounts" }) : [];
+			const addr = (Array.isArray(accounts) && accounts[0]) ? String(accounts[0]) : String(lastAddress || "");
+			const chainId = p ? await p.request({ method: "eth_chainId" }) : null;
+			// Return only serializable fields (omit provider object to avoid circular structure)
+			return { success: true, result: { connected: Boolean(addr), address: addr, accounts: Array.isArray(accounts) ? accounts : [], chainId: chainId ? String(chainId) : null } };
+		} catch (e) {
+			return { success: false, error: String(e?.message || e) };
+		}
 	}
 
 	/**
@@ -247,7 +324,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 				params: [String(message ?? ""), addr],
 			});
 			log("signMessage success", { addr, hasSignature: Boolean(sig) });
-			sendToUnity("OnSigned", String(sig));
+			emitSigned(String(sig), addr);
 			return { success: true, result: String(sig) };
 		} catch (e) {
 			error("signMessage error:", e?.message || e);
@@ -270,7 +347,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			if (!p) throw new Error("Provider not available. Initialize and connect first.");
 			log("request:", req);
 			const result = await p.request(req);
-			sendToUnity("OnRequested", JSON.stringify(result));
+			emitRequested(result);
 			return { success: true, result };
 		} catch (e) {
 			error("request error:", req, e?.message || e);
@@ -366,15 +443,88 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	}
 
 	// ---------------------------------------------------------------------------
+	// JS Events API
+	// ---------------------------------------------------------------------------
+	/**
+	 * Subscribe to bridge events on the JS side.
+	 * @param {string} event
+	 * @param {(payload:any)=>void} handler
+	 */
+	function on(event, handler) {
+		try {
+			if (!event || typeof handler !== "function") return;
+			(jsEventHandlers[event] = jsEventHandlers[event] || []).push(handler);
+		} catch {}
+	}
+
+	/**
+	 * Unsubscribe from bridge events. If handler is omitted, removes all for the event.
+	 * @param {string} event
+	 * @param {(payload:any)=>void} [handler]
+	 */
+	function off(event, handler) {
+		try {
+			const list = jsEventHandlers[event];
+			if (!list) return;
+			if (!handler) { jsEventHandlers[event] = []; return; }
+			const idx = list.indexOf(handler);
+			if (idx >= 0) list.splice(idx, 1);
+		} catch {}
+	}
+
+	/**
+	 * Internal: emit JS event to all subscribed handlers.
+	 * @param {string} event
+	 * @param {any} [payload]
+	 */
+	function emitJs(event, payload) {
+		try {
+			const list = jsEventHandlers[event];
+			if (!list || list.length === 0) return;
+			// Copy array to avoid mutation issues during iteration
+			for (const fn of list.slice()) {
+				try { fn(payload); } catch {}
+			}
+		} catch {}
+	}
+
+	// ---------------------------------------------------------------------------
 	// Private API
 	// ---------------------------------------------------------------------------
 	
-	// Expose error emitters for interop (.jslib) to forward errors uniformly
-	function emitConnectError(message) { try { sendToUnity("OnConnectError", String(message ?? "")); } catch { } }
-	function emitDisconnectError(message) { try { sendToUnity("OnDisconnectError", String(message ?? "")); } catch {} }
-	function emitSignError(message) { try { sendToUnity("OnSignError", String(message ?? "")); } catch {} }
-	function emitRequestError(message) { try { sendToUnity("OnRequestedError", String(message ?? "")); } catch {} }
-	function emitConnectWithError(message) { try { sendToUnity("OnConnectedWithError", String(message ?? "")); } catch {} }
+	// Expose emitters for interop (.jslib) and to keep a single emission point
+	function emitConnected(address, accounts) {
+		try {
+			const addr = String(address ?? "");
+			if (lastEmittedIsConnected && lastEmittedAddress === addr) return; // dedupe
+			lastEmittedIsConnected = true;
+			lastEmittedAddress = addr;
+			try { sendToUnity("OnConnected", addr); } catch {}
+			try { emitJs("connected", { address: addr, accounts }); } catch {}
+		} catch {}
+	}
+	function emitDisconnected() {
+		try {
+			if (!lastEmittedIsConnected) return; // dedupe
+			lastEmittedIsConnected = false;
+			lastEmittedAddress = "";
+			try { sendToUnity("OnDisconnected", ""); } catch {}
+			try { emitJs("disconnected"); } catch {}
+		} catch {}
+	}
+	function emitSigned(signature, address) { try { sendToUnity("OnSigned", String(signature ?? "")); } catch {} try { emitJs("signed", { signature: String(signature ?? ""), address: address ? String(address) : undefined }); } catch {} }
+	function emitRequested(result) { try { sendToUnity("OnRequested", JSON.stringify(result)); } catch {} try { emitJs("requested", result); } catch {} }
+	function emitConnectedWith(result) { try { sendToUnity("OnConnectedWith", JSON.stringify(result)); } catch {} try { emitJs("connectedWith", result); } catch {} }
+	function emitChainChanged(chainId) { try { sendToUnity("OnChainChanged", String(chainId)); } catch {} try { emitJs("chainChanged", String(chainId)); } catch {} }
+	function emitConnectionDetails(result) { try { sendToUnity("OnConnectionDetails", JSON.stringify(result)); } catch {} try { emitJs("connectionDetails", result); } catch {} }
+	function emitConnectionDetailsError(message) { try { sendToUnity("OnConnectionDetailsError", String(message ?? "")); } catch {} try { emitJs("connectionDetailsError", String(message ?? "")); } catch {} }
+
+	// Error emitters
+	function emitConnectError(message) { try { sendToUnity("OnConnectError", String(message ?? "")); } catch { } try { emitJs("connectError", String(message ?? "")); } catch {} }
+	function emitDisconnectError(message) { try { sendToUnity("OnDisconnectError", String(message ?? "")); } catch {} try { emitJs("disconnectError", String(message ?? "")); } catch {} }
+	function emitSignError(message) { try { sendToUnity("OnSignError", String(message ?? "")); } catch {} try { emitJs("signError", String(message ?? "")); } catch {} }
+	function emitRequestError(message) { try { sendToUnity("OnRequestedError", String(message ?? "")); } catch {} try { emitJs("requestError", String(message ?? "")); } catch {} }
+	function emitConnectWithError(message) { try { sendToUnity("OnConnectedWithError", String(message ?? "")); } catch {} try { emitJs("connectedWithError", String(message ?? "")); } catch {} }
 
 	// ---------------------------------------------------------------------------
 	// Logging helpers (kept at the bottom for clarity)
@@ -417,6 +567,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 * @returns {boolean} True if a new subscription was applied; false if skipped
 	 */
 	function subscribeProviderEvents(passed) {
+		console.log("subscribeProviderEvents", passed);
 		const p = passed || getProvider();
 		if (!p) { log("subscribeProviderEvents: provider not available"); return false; }
 		if (subscribedProvider === p) { log("subscribeProviderEvents: already subscribed"); return true; }
@@ -433,10 +584,11 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			const addr = Array.isArray(accounts) && accounts[0] ? String(accounts[0]) : "";
 			lastAddress = addr;
 			log("accountsChanged:", { addr, accounts });
-			if (addr) sendToUnity("OnConnected", addr); else sendToUnity("OnDisconnected", "");
+			if (addr) { emitConnected(addr, accounts); }
+			else { emitDisconnected(); }
 		};
-		const onChainChanged = (cid) => { log("chainChanged:", cid); sendToUnity("OnChainChanged", String(cid)); };
-		const onDisconnect = (err) => { log("disconnect event:", err?.message || err); emitDisconnectError(String(err?.message || "Disconnected")); };
+		const onChainChanged = (cid) => { log("chainChanged:", cid); emitChainChanged(String(cid)); };
+		const onDisconnect = (err) => { log("disconnect event:", err?.message || err); emitDisconnectError(String(err?.message || "Disconnected")); emitDisconnected(); };
 		try {
 			if (!p) throw new Error("Provider not available");
 			p.on?.("accountsChanged", onAccountsChanged);
@@ -455,7 +607,6 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 * @returns {import('@metamask/providers').MetaMaskInpageProvider | null}
 	 */
 	function getProvider() {
-		if (provider) return provider;
 		try {
 			const p = sdk?.getProvider?.();
 			if (p) provider = p;
@@ -473,9 +624,16 @@ import { MetaMaskSDK } from "@metamask/sdk";
 		signMessage,
 		request,
 		isInitialized,
+		isConnected,
+		getConnectionState,
+		getConnectionDetails,
 		setUnityInstance,
 		setUnityGameObjectName,
 		setDebug,
+		on,
+		off,
+		emitConnectionDetails,
+		emitConnectionDetailsError,
 		emitConnectError,
 		emitDisconnectError,
 		emitSignError,

@@ -11,6 +11,18 @@ namespace Gamenator.Web3.MetaMaskUnity.Runtime.WebGL
     /// </summary>
     public static class Web3MetaMaskJsBridge
     {
+        [Serializable]
+        public struct ConnectionState
+        {
+            public bool connected;
+            public string address;
+
+            public override string ToString()
+            {
+                return $"ConnectionState: connected={connected}, address={address}";
+            }
+        }
+
         // --- Native bindings (available in WebGL builds) ---
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")] private static extern int W3MM_Init(string optionsJson);
@@ -22,7 +34,10 @@ namespace Gamenator.Web3.MetaMaskUnity.Runtime.WebGL
         [DllImport("__Internal")] private static extern void W3MM_ConnectWith(string method, string paramsJson);
         [DllImport("__Internal")] private static extern void W3MM_Request(string method, string paramsJson);
         [DllImport("__Internal")] private static extern void W3MM_SetDebug(int enabled);
-        [DllImport("__Internal")] private static extern void W3MM_SetUnityGameObjectName(string gameObjectName);
+        [DllImport("__Internal")] private static extern int W3MM_SetUnityGameObjectName(string gameObjectName);
+        [DllImport("__Internal")] private static extern int W3MM_IsConnected();
+        [DllImport("__Internal")] private static extern IntPtr W3MM_GetConnectionState();
+        [DllImport("__Internal")] private static extern void W3MM_GetConnectionDetails();
 #endif
 
         /// <summary>
@@ -154,7 +169,51 @@ namespace Gamenator.Web3.MetaMaskUnity.Runtime.WebGL
                 throw new ArgumentException("gameObjectName cannot be null or empty", nameof(gameObjectName));
             }
 #if UNITY_WEBGL && !UNITY_EDITOR
-            W3MM_SetUnityGameObjectName(gameObjectName);
+            var ok = W3MM_SetUnityGameObjectName(gameObjectName);
+            if (ok != 1) { /* optional: handle failure silently */ }
+#else
+            // No-op in Editor/Non-WebGL
+#endif
+        }
+
+        /// <summary>
+        /// Returns whether a wallet address is currently cached as connected.
+        /// </summary>
+        public static bool IsConnected()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { return W3MM_IsConnected() == 1; } catch { return false; }
+#else
+            return false;
+#endif
+        }
+
+        /// <summary>
+        /// Returns cached connection state with minimal fields.
+        /// </summary>
+        public static ConnectionState GetConnectionState()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try
+            {
+                var ptr = W3MM_GetConnectionState();
+                var json = Marshal.PtrToStringAnsi(ptr);
+                if (string.IsNullOrEmpty(json)) return null;
+                return JsonUtility.FromJson<ConnectionState>(json);
+            }
+            catch { return null; }
+#else
+            return default;
+#endif
+        }
+
+        /// <summary>
+        /// Asynchronously queries provider for details and sends result to Unity callback OnConnectionDetails(string json).
+        /// </summary>
+        public static void GetConnectionDetails()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { W3MM_GetConnectionDetails(); } catch { }
 #else
             // No-op in Editor/Non-WebGL
 #endif
