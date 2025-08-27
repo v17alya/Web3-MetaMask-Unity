@@ -54,11 +54,15 @@ Choose one of the following:
       infuraAPIKey: 'YOUR_INFURA_KEY',
       // Optionally pass callback GameObject and/or Unity instance (if available here)
       // unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
-      debug: false
+      debug: false,
       // Optional JS-side events (you can also use MetaMaskBridge.on/off later)
+      events: {
+        connected: ({ address, accounts }) => console.log('connected', address, accounts),
         disconnected: () => console.log('disconnected'),
         chainChanged: (cid) => console.log('chainChanged', cid),
         signed: ({ signature, address }) => console.log('signed', signature, address),
+        requested: (result) => console.log('requested', result),
+        connectError: (m) => console.warn('connectError', m),
         requestError: (m) => console.warn('requestError', m),
         // Connection details emits
         connectionDetails: (res) => console.log('connectionDetails', res),
