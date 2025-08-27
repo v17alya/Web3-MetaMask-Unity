@@ -28,7 +28,18 @@ This sample demonstrates a minimal end-to-end setup of the Web3-MetaMask bridge 
       infuraAPIKey: 'YOUR_INFURA_KEY',
       // Optional: pass callback GameObject name and/or Unity instance
       // unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
-      debug: false
+      debug: false,
+      // Optional JS-side events
+      events: {
+        connected: ({ address, accounts }) => console.log('connected', address, accounts),
+        disconnected: () => console.log('disconnected'),
+        chainChanged: (cid) => console.log('chainChanged', cid),
+        signed: ({ signature, address }) => console.log('signed', signature, address),
+        requested: (result) => console.log('requested', result),
+        // Connection details
+        connectionDetails: (res) => console.log('connectionDetails', res),
+        connectionDetailsError: (m) => console.warn('connectionDetailsError', m)
+      }
     });
   </script>
 </head>
@@ -92,8 +103,35 @@ Implement these on the target GameObject (default `Web3BridgeSample`):
 - `OnConnectedWith(string json)` / `OnConnectedWithError(string message)`
 - `OnConnectError(string message)` / `OnDisconnectError(string message)`
 - `OnChainChanged(string chainId)`
+- `OnConnectionDetails(string json)` / `OnConnectionDetailsError(string message)`
+
+## Diagnostics (optional)
+
+### From JavaScript
+```html
+<script>
+  // Quick checks
+  const connected = MetaMaskBridge.isConnected();
+  const state = MetaMaskBridge.getConnectionState(); // { connected, address }
+  MetaMaskBridge.getConnectionDetails().then(res => console.log(res));
+
+  // Subscribe/unsubscribe at runtime
+  const onConnected = ({ address }) => console.log('connected later', address);
+  MetaMaskBridge.on('connected', onConnected);
+  // MetaMaskBridge.off('connected', onConnected);
+</script>
+```
+
+### From C# (WebGL)
+```csharp
+// Quick checks
+bool isConnected = Web3MetaMaskJsBridge.IsConnected();
+var state = Web3MetaMaskJsBridge.GetConnectionState(); // { connected, address }
+Web3MetaMaskJsBridge.GetConnectionDetails(); // emits OnConnectionDetails / OnConnectionDetailsError
+```
 
 ## Notes
 - The template’s `index.html` calls `MetaMaskBridge.init({ dappMetadata, infuraAPIKey, ... })` and, after Unity loads, passes the `unityInstance` via `MetaMaskBridge.setUnityInstance(unityInstance)`.
 - This sample is intended to verify the integration using the prebuilt `web3-metamask-bridge.js` included with the template — no separate Vite build is required here.
 - Ensure the bridge JS is loaded before any code that calls `MetaMaskBridge`.
+- The provider object is not returned (non‑serializable). Use `MetaMaskBridge.request({ method, params })` for RPC and JS events via `MetaMaskBridge.on(...)`.

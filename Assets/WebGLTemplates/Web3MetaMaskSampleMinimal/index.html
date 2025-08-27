@@ -62,6 +62,9 @@
         <textarea id="cwParams" placeholder='["0x..."]'></textarea>
         <button onclick="connectWithRpc()">ConnectWith</button>
         <button onclick="checkInitialized()">IsInitialized?</button>
+        <button onclick="checkIsConnected()">IsConnected?</button>
+        <button onclick="getConnState()">GetConnectionState</button>
+        <button onclick="getConnDetails()">GetConnectionDetails</button>
       </div>
     </div>
     <button id="controls-toggle" onclick="togglePanel()">Hide Panel</button>
@@ -113,6 +116,23 @@
             debug: true,
             unity: {
               gameObjectName: gameObjectName
+            },
+            events: {
+              connected: ({ address, accounts }) => {
+                console.log('[MM] connected', address, accounts);
+                const p = document.createElement('p'); p.textContent = `connected: ${address} (${(accounts||[]).length})`; document.body.appendChild(p);
+              },
+              disconnected: () => {
+                console.log('[MM] disconnected');
+                const p = document.createElement('p'); p.textContent = 'disconnected'; document.body.appendChild(p);
+              },
+              chainChanged: (cid) => { console.log('[MM] chainChanged', cid); },
+              signed: ({ signature, address }) => { console.log('[MM] signed', signature, address); },
+              requested: (result) => { console.log('[MM] requested', result); },
+              connectError: (m) => { console.warn('[MM] connectError', m); },
+              disconnectError: (m) => { console.warn('[MM] disconnectError', m); },
+              signError: (m) => { console.warn('[MM] signError', m); },
+              requestError: (m) => { console.warn('[MM] requestError', m); },
             }
           });
         } catch (e) { console.error('Bridge init error:', e); }
@@ -144,8 +164,15 @@
         let params = undefined; if (ptxt) { try { params = JSON.parse(ptxt); } catch (e) { alert('Invalid JSON in connectWith params'); return; } }
         try { MetaMaskBridge.connectWith({ method: m, params }); } catch (e) { console.error(e); }
       }
+
+      // Example of on/off subscription outside init
+      const handler = (p) => console.log('[MM][on] connected later', p);
+      try { MetaMaskBridge.on('connected', handler); setTimeout(() => MetaMaskBridge.off('connected', handler), 15000); } catch {}
       /** Diagnostic utility to check if the bridge has been initialized */
       function checkInitialized() { try { const ok = MetaMaskBridge.isInitialized(); console.log('[MetaMaskBridge] isInitialized:', ok); alert('isInitialized: ' + ok); } catch (e) { console.error(e); } }
+      function checkIsConnected() { try { const ok = MetaMaskBridge.isConnected(); console.log('[MetaMaskBridge] isConnected:', ok); alert('isConnected: ' + ok); } catch (e) { console.error(e); } }
+      function getConnState() { try { const s = MetaMaskBridge.getConnectionState(); console.log('[MetaMaskBridge] state:', s); alert('state: ' + JSON.stringify(s)); } catch (e) { console.error(e); } }
+      function getConnDetails() { try { MetaMaskBridge.getConnectionDetails().then(r => { console.log('[MetaMaskBridge] details:', r); alert('details: ' + JSON.stringify(r)); }).catch(console.error); } catch (e) { console.error(e); } }
 
       /**
        * Read text from browser clipboard and forward to Unity clipboard via SendMessage.

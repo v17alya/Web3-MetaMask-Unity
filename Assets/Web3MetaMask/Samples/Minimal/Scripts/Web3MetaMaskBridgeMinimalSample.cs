@@ -26,6 +26,7 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
         [SerializeField][TextArea(2, 6)] private string _requestParamsJson = "[]";
         [SerializeField] private string _connectWithMethod = "eth_getBalance";
         [SerializeField][TextArea(2, 6)] private string _connectWithParamsJson = "[]";
+        [SerializeField] private bool _showConnectionStateButtons = true;
         private string _lastLog = string.Empty;
 
         #region Public API
@@ -120,6 +121,31 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
             if (GUI.Button(new Rect(x, y, w, h), "ConnectWith (RPC)")) { ConnectWith(_connectWithMethod, string.IsNullOrWhiteSpace(_connectWithParamsJson) ? null : _connectWithParamsJson); }
             y += h + pad;
 
+            if (_showConnectionStateButtons)
+            {
+                if (GUI.Button(new Rect(x, y, w, h), "IsConnected?"))
+                {
+                    var ok = Web3MetaMaskJsBridge.IsConnected();
+                    _lastLog = $"IsConnected: {ok}";
+                    Debug.Log(_lastLog);
+                }
+                y += h + pad;
+
+                if (GUI.Button(new Rect(x, y, w, h), "GetConnectionState (sync)"))
+                {
+                    var json = Web3MetaMaskJsBridge.GetConnectionState();
+                    _lastLog = $"State: {json}";
+                    Debug.Log(_lastLog);
+                }
+                y += h + pad;
+
+                if (GUI.Button(new Rect(x, y, w, h), "GetConnectionDetails (async)"))
+                {
+                    Web3MetaMaskJsBridge.GetConnectionDetails();
+                }
+                y += h + pad;
+            }
+
             GUI.Label(new Rect(x - 270, y, 800, 200), _lastLog);
         }
 
@@ -203,6 +229,19 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
             Debug.LogError(_lastLog);
         }
 
+        // New async details callback
+        private void OnConnectionDetails(string json)
+        {
+            _lastLog = $"ConnectionDetails: {json}";
+            Debug.Log(_lastLog);
+        }
+
+        private void OnConnectionDetailsError(string error)
+        {
+            _lastLog = $"ConnectionDetailsError: {error}";
+            Debug.LogError(_lastLog);
+        }
+
         private void OnClipboardFromHtml(string text)
         {
             GUIUtility.systemCopyBuffer = text ?? string.Empty;
@@ -213,4 +252,3 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
         #endregion
     }
 }
-

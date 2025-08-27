@@ -10,6 +10,9 @@ mergeInto(LibraryManager.library, {
 	W3MM_SetUnityInstance__deps: ['$__W3MM_emit'],
 	W3MM_SetDebug__deps: ['$__W3MM_emit'],
 	W3MM_SetUnityGameObjectName__deps: ['$__W3MM_emit'],
+	W3MM_IsConnected__deps: ['$__W3MM_emit'],
+	W3MM_GetConnectionState__deps: ['$__W3MM_emit'],
+	W3MM_GetConnectionDetails__deps: ['$__W3MM_emit'],
 
 	// Initialize MetaMask bridge with options JSON
 	W3MM_Init: function (optionsPtr) {
@@ -121,11 +124,47 @@ mergeInto(LibraryManager.library, {
 		try {
 			var goName = UTF8ToString(goPtr);
 			if (!window || !window.MetaMaskBridge || !window.MetaMaskBridge.setUnityGameObjectName) {
-				throw new Error('MetaMaskBridge.setUnityGameObjectName not found');
+				return 0;
 			}
 			window.MetaMaskBridge.setUnityGameObjectName(goName);
-		} catch (e) { __W3MM_emit('emitRequestError', e); }
+			return 1;
+		} catch (e) { return 0; }
 	}, 
+
+	// Query: isConnected (sync boolean)
+	W3MM_IsConnected: function () {
+		try {
+			if (!window || !window.MetaMaskBridge || !window.MetaMaskBridge.isConnected) return 0;
+			return window.MetaMaskBridge.isConnected() ? 1 : 0;
+		} catch (e) { return 0; }
+	},
+
+	// Query: getConnectionState (sync object → JSON string)
+	W3MM_GetConnectionState: function () {
+		try {
+			if (!window || !window.MetaMaskBridge || !window.MetaMaskBridge.getConnectionState) return stringToNewUTF8('null');
+			var s = window.MetaMaskBridge.getConnectionState();
+			return stringToNewUTF8(JSON.stringify(s));
+		} catch (e) { return stringToNewUTF8('null'); }
+	},
+
+	// Query: getConnectionDetails (async) – single success/error emits
+	W3MM_GetConnectionDetails: function () {
+		try {
+			if (!window || !window.MetaMaskBridge ||
+				typeof window.MetaMaskBridge.getConnectionDetails !== 'function' ||
+				typeof window.MetaMaskBridge.emitConnectionDetails !== 'function' ||
+				typeof window.MetaMaskBridge.emitConnectionDetailsError !== 'function') {
+				throw new Error('MetaMaskBridge getConnectionDetails/emitters not available');
+			}
+			window.MetaMaskBridge.getConnectionDetails().then(
+				function (res) { try { __W3MM_emit('emitConnectionDetails', JSON.stringify(res || {})); } catch (e2) { /* fallthrough */ } },
+				function (err) { try { __W3MM_emit('emitConnectionDetailsError', err); } catch (e3) { /* fallthrough */ } }
+			);
+		} catch (e) {
+			try { __W3MM_emit('emitConnectionDetailsError', e); } catch {}
+		}
+	},
 	
 	// Internal emit method (library-local helper)
 	$__W3MM_emit: function(methodName, err) {
