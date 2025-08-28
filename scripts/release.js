@@ -55,6 +55,44 @@ function gitMergeSquashFrom(branch) {
   run(`git merge --squash ${branch}`);
 }
 
+function gitBranchExistsLocal(branch) {
+  try {
+    runCapture(`git show-ref --verify --quiet refs/heads/${branch}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function gitRemoteBranchExists(branch) {
+  try {
+    const out = runCapture(`git ls-remote --heads origin ${branch}`);
+    return !!out;
+  } catch {
+    return false;
+  }
+}
+
+function normalizeBranch(input) {
+  if (!input) return input;
+  return input.startsWith('origin/') ? input.slice('origin/'.length) : input;
+}
+
+function gitCheckoutOrTrack(branch) {
+  const b = normalizeBranch(branch);
+  if (gitBranchExistsLocal(b)) {
+    gitCheckout(b);
+    return;
+  }
+  if (gitRemoteBranchExists(b)) {
+    // Create local branch tracking remote
+    run(`git fetch origin ${b}:${b}`);
+    gitCheckout(b);
+    return;
+  }
+  throw new Error(`Branch not found locally or on origin: ${b}`);
+}
+
 function gitTagExists(tag) {
   try {
     runCapture(`git rev-parse --verify refs/tags/${tag}`);
@@ -172,7 +210,7 @@ async function main() {
   if (!noGit) {
     ensureNoUncommittedChanges();
     if (!branch) throw new Error('Missing --branch <feature-branch>');
-    gitCheckout(branch);
+    gitCheckoutOrTrack(branch);
   }
 
   bumpVersion(version);
