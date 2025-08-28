@@ -2,6 +2,12 @@
 
 All notable changes to this package will be documented in this file.
 
+## [0.1.3] - 2025-08-28
+### Added
+- WebGL interop: added `W3MM_IsInitialized` in `.jslib` returning 1/0 from `window.MetaMaskBridge.isInitialized()`.
+- C# runtime: added `Web3MetaMaskJsBridge.IsInitialized()` to query SDK initialization state.
+- UI: added "IsInitialized?" button to `Web3BridgeTemplate.cs` and `Web3MetaMaskBridgeMinimalSample.cs` to log current initialization state.
+
 ## [0.1.2] - 2025-08-28
 ### Changed
 - Sample `Web3MetaMaskBridgeMinimalSample.cs`: refactored inline GUI actions into dedicated private methods (`ShowIsConnected`, `ShowConnectionStateSync`, `RequestConnectionDetailsAsync`) and added public wrappers (`IsConnected`, `GetConnectionState`, `GetConnectionDetails`) for clarity and reuse.

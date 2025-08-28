@@ -31,6 +31,12 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
 
         #region Public API
 
+        /// <summary>Get initialization state synchronously.</summary>
+        public bool IsInitialized()
+        {
+            return Web3MetaMaskJsBridge.IsInitialized();
+        }
+
         /// <summary>Initialize MetaMaskBridge (must be called before connect/sign).</summary>
         public bool Initialize(string initOptionsJson)
         {
@@ -141,6 +147,9 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
 
             if (_showConnectionStateButtons)
             {
+                if (GUI.Button(new Rect(x, y, w, h), "IsInitialized?")) { ShowIsInitialized(); }
+                y += h + pad;
+
                 if (GUI.Button(new Rect(x, y, w, h), "IsConnected?")) { ShowIsConnected(); }
                 y += h + pad;
 
@@ -157,6 +166,16 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
         #endregion
 
         #region Helpers
+
+        /// <summary>
+        /// Query initialization flag and log it to the screen and console.
+        /// </summary>
+        private void ShowIsInitialized()
+        {
+            var ok = IsInitialized();
+            _lastLog = $"IsInitialized: {ok}";
+            Debug.Log(_lastLog);
+        }
 
         /// <summary>
         /// Query connection flag and log it to the screen and console.

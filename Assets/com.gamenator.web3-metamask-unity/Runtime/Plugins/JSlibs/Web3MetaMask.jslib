@@ -11,6 +11,7 @@ mergeInto(LibraryManager.library, {
 	W3MM_SetDebug__deps: ['$__W3MM_emit'],
 	W3MM_SetUnityGameObjectName__deps: ['$__W3MM_emit'],
 	W3MM_IsConnected__deps: ['$__W3MM_emit'],
+	W3MM_IsInitialized__deps: ['$__W3MM_emit'],
 	W3MM_GetConnectionState__deps: ['$__W3MM_emit'],
 	W3MM_GetConnectionDetails__deps: ['$__W3MM_emit'],
 
@@ -136,6 +137,14 @@ mergeInto(LibraryManager.library, {
 		try {
 			if (!window || !window.MetaMaskBridge || !window.MetaMaskBridge.isConnected) return 0;
 			return window.MetaMaskBridge.isConnected() ? 1 : 0;
+		} catch (e) { return 0; }
+	},
+
+	// Query: isInitialized (sync boolean)
+	W3MM_IsInitialized: function () {
+		try {
+			if (!window || !window.MetaMaskBridge || !window.MetaMaskBridge.isInitialized) return 0;
+			return window.MetaMaskBridge.isInitialized() ? 1 : 0;
 		} catch (e) { return 0; }
 	},
 
