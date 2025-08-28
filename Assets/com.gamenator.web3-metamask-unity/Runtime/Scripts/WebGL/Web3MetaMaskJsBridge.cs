@@ -36,6 +36,7 @@ namespace Gamenator.Web3.MetaMaskUnity.Runtime.WebGL
         [DllImport("__Internal")] private static extern void W3MM_Request(string method, string paramsJson);
         [DllImport("__Internal")] private static extern void W3MM_SetDebug(int enabled);
         [DllImport("__Internal")] private static extern int W3MM_SetUnityGameObjectName(string gameObjectName);
+        [DllImport("__Internal")] private static extern int W3MM_IsInitialized();
         [DllImport("__Internal")] private static extern int W3MM_IsConnected();
         [DllImport("__Internal")] private static extern IntPtr W3MM_GetConnectionState();
         [DllImport("__Internal")] private static extern void W3MM_GetConnectionDetails();
@@ -174,6 +175,18 @@ namespace Gamenator.Web3.MetaMaskUnity.Runtime.WebGL
             if (ok != 1) { /* optional: handle failure silently */ }
 #else
             // No-op in Editor/Non-WebGL
+#endif
+        }
+
+        /// <summary>
+        /// Returns whether the JS bridge (MetaMask SDK) has been initialized.
+        /// </summary>
+        public static bool IsInitialized()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { return W3MM_IsInitialized() == 1; } catch { return false; }
+#else
+            return true; // Assume initialized outside WebGL for editor convenience
 #endif
         }
 
