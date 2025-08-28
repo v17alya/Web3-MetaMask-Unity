@@ -29,6 +29,8 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	let lastEmittedIsConnected = false;
 	/** @type {string} Deduplication state for connection emits to avoid double-calling when multiple sources trigger the same state. */
 	let lastEmittedAddress = "";
+	/** @type {Object} SDK options */
+	let sdkOptions = {};
 
 	// ---------------------------------------------------------------------------
 	// Public API (MetaMask SDK lifecycle and RPC)
@@ -126,7 +128,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			if (!infuraAPIKey) throw new Error("MetaMaskBridge.init requires infuraAPIKey");
 
 			// Construct MetaMask SDK instance (documented fields only and pass-through known options)
-			const sdkOptions = { dappMetadata, infuraAPIKey };
+			sdkOptions = { dappMetadata, infuraAPIKey };
 			if (typeof options.checkInstallationImmediately !== 'undefined') sdkOptions.checkInstallationImmediately = Boolean(options.checkInstallationImmediately);
 			if (typeof options.checkInstallationOnAllCalls !== 'undefined') sdkOptions.checkInstallationOnAllCalls = Boolean(options.checkInstallationOnAllCalls);
 			if (typeof options.communicationServerUrl !== 'undefined') sdkOptions.communicationServerUrl = String(options.communicationServerUrl);
@@ -160,6 +162,18 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	async function connect() {
 		try {
 			if (!sdk) throw new Error("MetaMaskBridge not initialized");
+			
+			// Force SDK to reset its internal state - fix of some issues with the SDK on mobile
+			if (sdkOptions) {
+				log("Terminating SDK to reset state");
+				await disconnect();
+				log("Re-initializing SDK");
+				sdk = new MetaMaskSDK(sdkOptions);
+				
+				// Wait a bit for SDK to initialize
+				await new Promise(resolve => setTimeout(resolve, 500));
+			}
+			
 			log("connect called");
 			const accounts = (sdk.connect ? await sdk.connect() : await getProvider()?.request({
 				method: "eth_requestAccounts",
@@ -354,6 +368,16 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			emitRequestError(String(e?.message || e));
 			return { success: false, error: String(e?.message || e) };
 		}
+	}
+
+	/**
+	 * Generate MetaMask deep link for mobile users
+	 * @returns {string} Deep link URL
+	 */
+	function generateMetaMaskDeepLink() {
+		const currentUrl = window.location.href;
+		const encodedUrl = encodeURIComponent(currentUrl);
+		return `https://metamask.app.link/dapp/${encodedUrl}`;
 	}
 
 	/**
@@ -632,6 +656,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 		setDebug,
 		on,
 		off,
+		generateMetaMaskDeepLink,
 		emitConnectionDetails,
 		emitConnectionDetailsError,
 		emitConnectError,

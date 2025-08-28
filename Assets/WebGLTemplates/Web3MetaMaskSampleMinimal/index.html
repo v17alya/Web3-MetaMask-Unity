@@ -65,6 +65,7 @@
         <button onclick="checkIsConnected()">IsConnected?</button>
         <button onclick="getConnState()">GetConnectionState</button>
         <button onclick="getConnDetails()">GetConnectionDetails</button>
+        <button onclick="testGenerateLink()">Generate Deep Link</button>
       </div>
     </div>
     <button id="controls-toggle" onclick="togglePanel()">Hide Panel</button>
@@ -114,6 +115,7 @@
             dappMetadata: { name: dappName, url: dappUrl },
             infuraAPIKey: infura,
             debug: true,
+            openDeeplink: openDeeplink,
             unity: {
               gameObjectName: gameObjectName
             },
@@ -173,6 +175,26 @@
       function checkIsConnected() { try { const ok = MetaMaskBridge.isConnected(); console.log('[MetaMaskBridge] isConnected:', ok); alert('isConnected: ' + ok); } catch (e) { console.error(e); } }
       function getConnState() { try { const s = MetaMaskBridge.getConnectionState(); console.log('[MetaMaskBridge] state:', s); alert('state: ' + JSON.stringify(s)); } catch (e) { console.error(e); } }
       function getConnDetails() { try { MetaMaskBridge.getConnectionDetails().then(r => { console.log('[MetaMaskBridge] details:', r); alert('details: ' + JSON.stringify(r)); }).catch(console.error); } catch (e) { console.error(e); } }
+      function testGenerateLink() { try { const link = MetaMaskBridge.generateMetaMaskDeepLink(); console.log('[MetaMaskBridge] Generated link:', link); alert('Generated link: ' + link); } catch (e) { console.error(e); } }
+      
+      /**
+       * Open MetaMask deep link (for SDK integration)
+       */
+      function openDeeplink(link) {
+        console.log('[MetaMaskBridge] openDeeplink called with:', link);
+        
+        // Generate the correct deeplink
+        const deeplink = MetaMaskBridge.generateMetaMaskDeepLink();
+        
+        console.log('[MetaMaskBridge] Generated deeplink:', deeplink);
+        
+        // Open the deeplink
+        try {
+          window.open(deeplink, '_blank');
+        } catch (e) {
+          console.error('[MetaMaskBridge] Failed to open deeplink:', e);
+        }
+      }
 
       /**
        * Read text from browser clipboard and forward to Unity clipboard via SendMessage.
