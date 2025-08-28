@@ -85,6 +85,24 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
             Web3MetaMaskJsBridge.ConnectAndSign(message);
         }
 
+        /// <summary>Get connection state synchronously.</summary>
+        public bool IsConnected()
+        {
+            return Web3MetaMaskJsBridge.IsConnected();
+        }
+
+        /// <summary>Get connection state synchronously.</summary>
+        public Web3MetaMaskJsBridge.ConnectionState GetConnectionState()
+        {
+            return Web3MetaMaskJsBridge.GetConnectionState();
+        }
+
+        /// <summary>Request connection details asynchronously (result arrives via OnConnectionDetails callbacks).</summary>
+        public void GetConnectionDetails()
+        {
+            Web3MetaMaskJsBridge.GetConnectionDetails();
+        }
+
         #endregion
 
         #region GUI
@@ -123,26 +141,13 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
 
             if (_showConnectionStateButtons)
             {
-                if (GUI.Button(new Rect(x, y, w, h), "IsConnected?"))
-                {
-                    var ok = Web3MetaMaskJsBridge.IsConnected();
-                    _lastLog = $"IsConnected: {ok}";
-                    Debug.Log(_lastLog);
-                }
+                if (GUI.Button(new Rect(x, y, w, h), "IsConnected?")) { ShowIsConnected(); }
                 y += h + pad;
 
-                if (GUI.Button(new Rect(x, y, w, h), "GetConnectionState (sync)"))
-                {
-                    var json = Web3MetaMaskJsBridge.GetConnectionState();
-                    _lastLog = $"State: {json}";
-                    Debug.Log(_lastLog);
-                }
+                if (GUI.Button(new Rect(x, y, w, h), "GetConnectionState (sync)")) { ShowConnectionStateSync(); }
                 y += h + pad;
 
-                if (GUI.Button(new Rect(x, y, w, h), "GetConnectionDetails (async)"))
-                {
-                    Web3MetaMaskJsBridge.GetConnectionDetails();
-                }
+                if (GUI.Button(new Rect(x, y, w, h), "GetConnectionDetails (async)")) { RequestConnectionDetailsAsync(); }
                 y += h + pad;
             }
 
@@ -152,6 +157,34 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
         #endregion
 
         #region Helpers
+
+        /// <summary>
+        /// Query connection flag and log it to the screen and console.
+        /// </summary>
+        private void ShowIsConnected()
+        {
+            var ok = IsConnected();
+            _lastLog = $"IsConnected: {ok}";
+            Debug.Log(_lastLog);
+        }
+
+        /// <summary>
+        /// Fetch current connection state synchronously and log JSON payload.
+        /// </summary>
+        private void ShowConnectionStateSync()
+        {
+            var json = GetConnectionState();
+            _lastLog = $"State: {json}";
+            Debug.Log(_lastLog);
+        }
+
+        /// <summary>
+        /// Request connection details asynchronously (result arrives via OnConnectionDetails callbacks).
+        /// </summary>
+        private void RequestConnectionDetailsAsync()
+        {
+            GetConnectionDetails();
+        }
 
         private string BuildInitOptionsJson()
         {
