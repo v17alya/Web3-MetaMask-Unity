@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 #if UNITY_WEBGL && !UNITY_EDITOR
 using System.Runtime.InteropServices;
 #endif
@@ -198,10 +199,10 @@ namespace Gamenator.Web3.MetaMaskUnity.Runtime.WebGL
             {
                 var ptr = W3MM_GetConnectionState();
                 var json = Marshal.PtrToStringAnsi(ptr);
-                if (string.IsNullOrEmpty(json)) return null;
+                if (string.IsNullOrEmpty(json)) return default;
                 return JsonUtility.FromJson<ConnectionState>(json);
             }
-            catch { return null; }
+            catch { return default; }
 #else
             return default;
 #endif

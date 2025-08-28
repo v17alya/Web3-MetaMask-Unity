@@ -2,6 +2,13 @@
 
 All notable changes to this package will be documented in this file.
 
+## [0.1.2] - 2025-08-28
+### Changed
+- Sample `Web3MetaMaskBridgeMinimalSample.cs`: refactored inline GUI actions into dedicated private methods (`ShowIsConnected`, `ShowConnectionStateSync`, `RequestConnectionDetailsAsync`) and added public wrappers (`IsConnected`, `GetConnectionState`, `GetConnectionDetails`) for clarity and reuse.
+
+### Fixed
+- `Web3MetaMaskJsBridge.cs`: corrected connection-state retrieval and interop safety (marshalling and error handling) to prevent occasional errors in WebGL builds.
+
 ## [0.1.1] - 2025-08-27
 ### Added
 - JS bridge events for JS-side interception and callbacks:
