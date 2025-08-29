@@ -184,13 +184,14 @@
         console.log('[MetaMaskBridge] openDeeplink called with:', link);
         
         // Generate the correct deeplink
-        const deeplink = MetaMaskBridge.generateMetaMaskDeepLink();
+        if (!window.ethereum)
+          link =  MetaMaskBridge.generateMetaMaskDeepLink();
         
-        console.log('[MetaMaskBridge] Generated deeplink:', deeplink);
+        console.log('[MetaMaskBridge] Generated deeplink:', link);
         
         // Open the deeplink
         try {
-          window.open(deeplink, '_blank');
+          window.open(link, '_blank');
         } catch (e) {
           console.error('[MetaMaskBridge] Failed to open deeplink:', e);
         }
