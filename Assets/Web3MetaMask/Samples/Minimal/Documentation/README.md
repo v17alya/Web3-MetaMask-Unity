@@ -10,7 +10,7 @@ This sample demonstrates a minimal end-to-end setup of the Web3-MetaMask bridge 
 ## Setup
 1) Import the sample (scene + template + scripts)
 - Recommended: Package Manager → MetaMask Unity → Samples → Import "Minimal"
-- Alternative: Double-click the Unity package in this sample’s root to import it into your project
+- Alternative: Double-click the Unity package in this sample's root to import it into your project
 
 2) Select the WebGL template in Project Settings
 - Open: Edit → Project Settings → Player → Resolution and Presentation
@@ -24,10 +24,8 @@ This sample demonstrates a minimal end-to-end setup of the Web3-MetaMask bridge 
   <script>
     // Initialize before any MetaMaskBridge usage
     MetaMaskBridge.init({
-      dappMetadata: { name: 'MetaMask Sample', url: window.location.href },
-      infuraAPIKey: 'YOUR_INFURA_KEY',
-      // Optional: pass callback GameObject name and/or Unity instance
-      // unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
+      // Unity wiring (optional): callback GameObject name and/or Unity instance
+      unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
       debug: false,
       // Optional JS-side events
       events: {
@@ -39,6 +37,11 @@ This sample demonstrates a minimal end-to-end setup of the Web3-MetaMask bridge 
         // Connection details
         connectionDetails: (res) => console.log('connectionDetails', res),
         connectionDetailsError: (m) => console.warn('connectionDetailsError', m)
+      },
+      // REQUIRED: SDK options object containing dappMetadata and infuraAPIKey
+      sdkOptions: {
+        dappMetadata: { name: 'MetaMask Sample', url: window.location.href },
+        infuraAPIKey: 'YOUR_INFURA_KEY'
       }
     });
   </script>
@@ -65,8 +68,10 @@ public class Example : MonoBehaviour
     {
         // Initialize from C# (call once before connect/sign/request)
         var optionsJson = JsonUtility.ToJson(new {
-            dappMetadata = new { name = "MetaMask Sample", url = Application.absoluteURL },
-            infuraAPIKey = "YOUR_INFURA_KEY",
+            sdkOptions = new {
+                dappMetadata = new { name = "MetaMask Sample", url = Application.absoluteURL },
+                infuraAPIKey = "YOUR_INFURA_KEY"
+            },
             debug = true,
             unity = new { gameObjectName = gameObject.name }
         });
@@ -115,6 +120,19 @@ Implement these on the target GameObject (default `Web3BridgeSample`):
   const state = MetaMaskBridge.getConnectionState(); // { connected, address }
   MetaMaskBridge.getConnectionDetails().then(res => console.log(res));
 
+  // Check connection status without prompting
+  MetaMaskBridge.checkConnection().then(result => {
+    if (result.success && result.result.connected) {
+      console.log('User is connected:', result.result.address);
+    } else {
+      console.log('User is not connected');
+    }
+  });
+
+  // Generate mobile deeplink
+  const deeplink = MetaMaskBridge.generateMetaMaskDeepLink();
+  console.log('MetaMask deeplink:', deeplink);
+
   // Subscribe/unsubscribe at runtime
   const onConnected = ({ address }) => console.log('connected later', address);
   MetaMaskBridge.on('connected', onConnected);
@@ -131,7 +149,9 @@ Web3MetaMaskJsBridge.GetConnectionDetails(); // emits OnConnectionDetails / OnCo
 ```
 
 ## Notes
-- The template’s `index.html` calls `MetaMaskBridge.init({ dappMetadata, infuraAPIKey, ... })` and, after Unity loads, passes the `unityInstance` via `MetaMaskBridge.setUnityInstance(unityInstance)`.
+- The template's `index.html` calls `MetaMaskBridge.init({ sdkOptions: { dappMetadata, infuraAPIKey }, ... })` and, after Unity loads, passes the `unityInstance` via `MetaMaskBridge.setUnityInstance(unityInstance)`.
 - This sample is intended to verify the integration using the prebuilt `web3-metamask-bridge.js` included with the template — no separate Vite build is required here.
 - Ensure the bridge JS is loaded before any code that calls `MetaMaskBridge`.
 - The provider object is not returned (non‑serializable). Use `MetaMaskBridge.request({ method, params })` for RPC and JS events via `MetaMaskBridge.on(...)`.
+- The `init` method now returns a result object with `success`, `result`, and optional `error` properties.
+- Required options are now nested under `sdkOptions.dappMetadata` and `sdkOptions.infuraAPIKey`.

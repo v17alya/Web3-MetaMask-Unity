@@ -152,12 +152,8 @@ Include the script in your template index.html (ensure it's loaded before any co
   <script>
     // Initialize bridge BEFORE calling connect/sign/request
     MetaMaskBridge.init({
-      // dapp identity shown during connection (trust context)
-      dappMetadata: { name: 'Your App', url: window.location.href },
-      // REQUIRED: enables read-only RPC and load-balancing
-      infuraAPIKey: 'YOUR_INFURA_KEY',
       // Unity wiring (optional): callback GameObject and/or Unity instance if available
-      // unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
+      unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
       debug: false,
       // Optional JS-side events (you can also use MetaMaskBridge.on/off)
       events: {
@@ -171,6 +167,13 @@ Include the script in your template index.html (ensure it's loaded before any co
         // Connection detail emits
         connectionDetails: (res) => console.log('connectionDetails', res),
         connectionDetailsError: (m) => console.warn('connectionDetailsError', m)
+      },
+      // REQUIRED: SDK options object containing dappMetadata and infuraAPIKey
+      sdkOptions: {
+        // dapp identity shown during connection (trust context)
+        dappMetadata: { name: 'Your App', url: window.location.href },
+        // REQUIRED: enables read-only RPC and load-balancing
+        infuraAPIKey: 'YOUR_INFURA_KEY'
       }
     });
   </script>
@@ -188,16 +191,54 @@ Optionally wire the Unity instance after load:
 ```
 
 ## Options explained
-- **dappMetadata**: Displays your dapp name/url/icon in the MetaMask connection prompt (trust context).
-- **infuraAPIKey**: Required. Enables read‑only RPC and load‑balancing for the SDK.
 - **unity.gameObjectName**: Optional. Unity GameObject name targeted by `SendMessage` for bridge callbacks.
 - **unity.instance**: Optional. Unity instance to enable callbacks immediately on init.
 - **debug**: Optional. Enables verbose logging inside the bridge.
+- **events**: Optional. JS-side event callbacks for various MetaMask events.
+- **sdkOptions**: Required. Direct SDK options object passed through to MetaMaskSDK. This object MUST contain:
+  - **dappMetadata**: Displays your dapp name/url/icon in the MetaMask connection prompt (trust context).
+  - **infuraAPIKey**: Required. Enables read‑only RPC and load‑balancing for the SDK.
 
 See the MetaMask SDK docs for details: https://docs.metamask.io/sdk/connect/javascript/
 
+## Connection Checking
+The bridge includes a `checkConnection()` method that uses the `eth_accounts` RPC method to check if MetaMask is connected without prompting the user. This is useful for:
+
+- **Auto-detection**: Check if the user is already connected when the page loads
+- **State management**: Update UI based on connection status without user interaction
+- **Avoiding prompts**: Determine connection status without triggering MetaMask popups
+
+Example usage:
+```javascript
+// Check connection status without prompting
+const result = await MetaMaskBridge.checkConnection();
+if (result.success && result.result.connected) {
+  console.log('User is connected:', result.result.address);
+  // Update UI to show connected state
+} else {
+  console.log('User is not connected');
+  // Show connect button
+}
+```
+
+The method automatically sets up `accountsChanged` event listeners to keep the connection state updated. It uses `window.ethereum` directly for better compatibility with bundled builds.
+
+## Mobile Deep Links
+The bridge includes a `generateMetaMaskDeepLink()` method that generates a MetaMask mobile deeplink URL for the current page. This is useful for:
+
+- **Mobile users**: Provide a direct link to open the dapp in MetaMask mobile
+- **Cross-platform**: Ensure mobile users can access the dapp even without the extension
+
+Example usage:
+```javascript
+// Generate deeplink for current page
+const deeplink = MetaMaskBridge.generateMetaMaskDeepLink();
+console.log('MetaMask deeplink:', deeplink);
+// Result: https://metamask.app.link/dapp/your-current-url
+```
+
 ## API surface (global)
-- `window.MetaMaskBridge.init({ dappMetadata, infuraAPIKey, unity?, debug?, ... })`
+- `window.MetaMaskBridge.init({ unity?, debug?, events?, sdkOptions })` → `{ success: boolean, result?: any, error?: string }`
 - `window.MetaMaskBridge.connect()`
 - `window.MetaMaskBridge.connectAndSign(message)`
 - `window.MetaMaskBridge.connectWith({ method, params? })`
@@ -208,6 +249,8 @@ See the MetaMask SDK docs for details: https://docs.metamask.io/sdk/connect/java
 - `window.MetaMaskBridge.isConnected()`
 - `window.MetaMaskBridge.getConnectionState()` → `{ connected, address }`
 - `window.MetaMaskBridge.getConnectionDetails()` → `{ success, result?: { connected, address, accounts, chainId }, error?: string }`
+- `window.MetaMaskBridge.checkConnection()` → `{ success, result?: { connected, address, accounts }, error?: string }`
+- `window.MetaMaskBridge.generateMetaMaskDeepLink()` → `string`
 - `window.MetaMaskBridge.setUnityInstance({ instance? } | instance)`
 - `window.MetaMaskBridge.setUnityGameObjectName(name)`
 - `window.MetaMaskBridge.setDebug(enabled)`
@@ -215,6 +258,8 @@ See the MetaMask SDK docs for details: https://docs.metamask.io/sdk/connect/java
 
 Notes:
 - Provider object is not returned (non-serializable); use `request({...})` for RPC and `on('chainChanged'|...)` for events.
+- The `init` method now returns a result object with `success`, `result`, and optional `error` properties.
+- Required options are now nested under `sdkOptions.dappMetadata` and `sdkOptions.infuraAPIKey`.
 
 ## Unity callbacks (GameObject: default `Web3Bridge`)
 - `OnConnected(string address)` / `OnDisconnected(string empty)`
