@@ -246,7 +246,14 @@ function resolveNpmPath(overridePath) {
   throw new Error('npm not found. Please ensure Node.js is installed and accessible.');
 }
 
-function exportUnityPackage(cliUnityPath) {
+function exportUnityPackage(cliUnityPath, closeUnity = false) {
+  if (closeUnity) {
+    console.log('Unity export requested with --close-unity flag.');
+    console.log('Please close Unity Editor manually and run the release script again with --skip-unity to continue.');
+    console.log('Or run the Unity export manually from the menu: Tools/Web3/MetaMask/Export Minimal Sample UnityPackage');
+    return;
+  }
+  
   const unity = resolveUnityPath(cliUnityPath);
   const projectPath = projectRoot;
   const method = 'Gamenator.Web3.MetaMaskUnity.Editor.SampleExporter.ExportMinimalSampleCli';
@@ -277,6 +284,8 @@ function parseArgs() {
       out.npmPath = process.argv[++i];
     } else if (a === '--node') {
       out.nodePath = process.argv[++i];
+    } else if (a === '--close-unity') {
+      out.closeUnity = true;
     } else if (a === '--branch' || a === '-b') {
       out.branch = process.argv[++i];
     } else if (a === '--no-git') {
@@ -287,7 +296,7 @@ function parseArgs() {
 }
 
 async function main() {
-  const { version, skipUnity, skipBridge, unityPath, npmPath, nodePath, branch, noGit } = parseArgs();
+  const { version, skipUnity, skipBridge, unityPath, npmPath, nodePath, branch, noGit, closeUnity } = parseArgs();
   if (!version) throw new Error('Missing --version');
 
   if (!noGit) {
@@ -304,7 +313,7 @@ async function main() {
     console.log('Skipping bridge build and artifact copy.');
   }
   if (!skipUnity) {
-    exportUnityPackage(unityPath);
+    exportUnityPackage(unityPath, closeUnity);
   }
 
   if (!noGit) {

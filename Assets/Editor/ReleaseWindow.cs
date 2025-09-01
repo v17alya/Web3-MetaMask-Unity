@@ -19,12 +19,13 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
         private string _npmPathOverride = string.Empty;
         private bool _skipUnityExport = false;
         private bool _skipBridgeBuild = false;
+        private bool _closeUnityBeforeExport = true;
 
         [MenuItem("Tools/Web3/MetaMask/Release...", priority = 200)]
         public static void Open()
         {
             var wnd = GetWindow<ReleaseWindow>(utility: false, title: "Web3 MetaMask Release", focus: true);
-            wnd.minSize = new Vector2(480, 250);
+            wnd.minSize = new Vector2(480, 280);
             wnd.Show();
         }
 
@@ -38,18 +39,19 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
             _npmPathOverride = EditorGUILayout.TextField("NPM Path (optional)", _npmPathOverride);
             _skipUnityExport = EditorGUILayout.ToggleLeft("Skip Unity Export (only bump/build/copy)", _skipUnityExport);
             _skipBridgeBuild = EditorGUILayout.ToggleLeft("Skip Bridge Build (use existing dist)", _skipBridgeBuild);
+            _closeUnityBeforeExport = EditorGUILayout.ToggleLeft("Close Unity before export (recommended)", _closeUnityBeforeExport);
 
             GUILayout.Space(8);
             if (GUILayout.Button("Run Release"))
             {
-                RunRelease(_version, _featureBranch, _unityPathOverride, _nodePathOverride, _npmPathOverride, _skipUnityExport, _skipBridgeBuild);
+                RunRelease(_version, _featureBranch, _unityPathOverride, _nodePathOverride, _npmPathOverride, _skipUnityExport, _skipBridgeBuild, _closeUnityBeforeExport);
             }
 
             GUILayout.Space(6);
-            EditorGUILayout.HelpBox("This will bump version in package.json, build the JS bridge, copy artifacts to the project, optionally export the Minimal Sample, then squash-merge the feature branch into main, create the tag and push.", MessageType.Info);
+            EditorGUILayout.HelpBox("This will bump version in package.json, build the JS bridge, copy artifacts to the project, optionally export the Minimal Sample, then squash-merge the feature branch into main, create the tag and push.\n\nNote: If Unity export fails due to another Unity instance, check 'Close Unity before export' and run again.", MessageType.Info);
         }
 
-        private static void RunRelease(string version, string branch, string unityPathOverride, string nodePathOverride, string npmPathOverride, bool skipUnity, bool skipBridge)
+        private static void RunRelease(string version, string branch, string unityPathOverride, string nodePathOverride, string npmPathOverride, bool skipUnity, bool skipBridge, bool closeUnityBeforeExport)
         {
             if (string.IsNullOrWhiteSpace(version))
             {
@@ -114,6 +116,12 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
             if (!string.IsNullOrWhiteSpace(resolvedNpmPath))
             {
                 args += $" --npm \"{resolvedNpmPath}\"";
+            }
+            
+            // Add close-unity flag if requested
+            if (closeUnityBeforeExport)
+            {
+                args += " --close-unity";
             }
 
             // Prefer npm exec node to respect workspace Node
