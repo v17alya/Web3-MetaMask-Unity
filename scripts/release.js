@@ -80,6 +80,14 @@ function normalizeBranch(input) {
 
 function gitCheckoutOrTrack(branch) {
   const b = normalizeBranch(branch);
+  const currentBranch = gitCurrentBranch();
+  
+  // If we're already on the target branch, do nothing
+  if (currentBranch === b) {
+    console.log(`Already on branch: ${b}`);
+    return;
+  }
+  
   if (gitBranchExistsLocal(b)) {
     gitCheckout(b);
     return;
