@@ -10,13 +10,16 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
     public class Web3Bridge : MonoBehaviour
     {
         [System.Serializable]
+        private class SdkOptions { public DappMetadata dappMetadata; public string infuraAPIKey; }
+
+        [System.Serializable]
         private class DappMetadata { public string name; public string url; }
 
         [System.Serializable]
         public class UnityOptions { public string gameObjectName; }
 
         [System.Serializable]
-        private class InitOptions { public DappMetadata dappMetadata; public string infuraAPIKey; public bool debug; public UnityOptions unity; }
+        private class InitOptions { public SdkOptions sdkOptions; public UnityOptions unity; public bool debug; }
 
         [SerializeField] private string _dappName = "MetaMask Sample";
         [SerializeField] private string _dappUrl = "http://localhost";
@@ -209,10 +212,9 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
         {
             var options = new InitOptions
             {
-                dappMetadata = new DappMetadata { name = _dappName ?? string.Empty, url = _dappUrl ?? string.Empty },
-                infuraAPIKey = _infuraApiKey ?? string.Empty,
+                sdkOptions = new SdkOptions { dappMetadata = new DappMetadata { name = _dappName ?? null, url = _dappUrl ?? null }, infuraAPIKey = _infuraApiKey ?? null},
+                unity = new UnityOptions { gameObjectName = gameObject.name },
                 debug = true,
-                unity = new UnityOptions { gameObjectName = gameObject.name }
             };
             return JsonUtility.ToJson(options);
         }

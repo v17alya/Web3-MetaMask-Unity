@@ -102,4 +102,36 @@ body {
   }
 }
 
+#controls { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; background: rgba(12,14,22,0.92); padding: 12px; border-bottom: 1px solid #3b4160; box-shadow: 0 6px 16px rgba(0,0,0,0.35); transform: translateY(0); transition: transform .22s ease; }
+#controls.collapsed { transform: translateY(-110%); pointer-events: none; }
+#controls .group { display: flex; flex-direction: column; gap: 6px; }
+#controls label { font: 12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu; color: #b9c0ff; }
+#controls input, #controls textarea { width: 100%; box-sizing: border-box; background: #1e2235; color: #e8eaff; border: 1px solid #3b4160; border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+#controls textarea { min-height: 58px; resize: vertical; }
+#controls button { background: #2a2f45; border: 1px solid #3b4160; color: #e8eaff; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+#controls button:hover { background: #363d5a; }
+#controls-toggle { position: fixed; top: 8px; right: 8px; z-index: 11; background: #2a2f45; border: 1px solid #3b4160; color: #e8eaff; padding: 6px 10px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+#controls.collapsed + #controls-toggle { top: 8px; }
 
+/* Mobile-specific styles for better scrolling */
+@media (max-width: 768px) {
+#controls { 
+    max-height: 70vh; 
+    overflow-y: auto; 
+    -webkit-overflow-scrolling: touch; 
+    grid-template-columns: 1fr; 
+    gap: 8px; 
+    padding: 10px; 
+}
+#controls .group { gap: 4px; }
+#controls label { font-size: 11px; }
+#controls input, #controls textarea { font-size: 11px; padding: 8px; }
+#controls button { padding: 10px 12px; font-size: 12px; }
+#controls-toggle { padding: 8px 12px; font-size: 12px; }
+}
+
+/* Ensure Unity canvas doesn't interfere with scrolling */
+.unity-mobile #unity-container { 
+position: relative; 
+z-index: 1; 
+}
