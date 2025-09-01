@@ -286,6 +286,25 @@
             fullscreenButton.onclick = () => unityInstance.SetFullscreen(1);
           }
           window.unityInstance = unityInstance;
+
+          // Re-apply input focus handlers after Unity loads
+          setTimeout(function() {
+            const inputs = document.querySelectorAll('#controls input, #controls textarea');
+            inputs.forEach(function(input) {
+              input.addEventListener('focus', function() {
+                if (window.unityInstance && window.unityInstance.SendMessage) {
+                  window.unityInstance.SendMessage('Web3BridgeSample', 'OnHtmlInputFocus', 'true');
+                }
+              });
+              
+              input.addEventListener('blur', function() {
+                if (window.unityInstance && window.unityInstance.SendMessage) {
+                  window.unityInstance.SendMessage('Web3BridgeSample', 'OnHtmlInputFocus', 'false');
+                }
+              });
+            });
+          }, 1000);
+
           // Wire Unity instance to bridge
           try { 
             MetaMaskBridge.setUnityGameObjectName(gameObjectName);
