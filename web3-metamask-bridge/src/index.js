@@ -10,8 +10,6 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	/** @type {import('@metamask/sdk').MetaMaskSDK | null} */
 	let sdk = null;
 	/** @type {import('@metamask/providers').MetaMaskInpageProvider | null} */
-	let provider = null;
-	/** @type {import('@metamask/providers').MetaMaskInpageProvider | null} */
 	let subscribedProvider = null;
 	/** @type {{ onAccountsChanged:(a:any[])=>void; onChainChanged:(c:any)=>void; onDisconnect:(e:any)=>void } | null} */
 	let providerEventHandlers = null;
@@ -29,6 +27,8 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	let lastEmittedIsConnected = false;
 	/** @type {string} Deduplication state for connection emits to avoid double-calling when multiple sources trigger the same state. */
 	let lastEmittedAddress = "";
+	/** @type {Object} SDK options */
+	let sdkOptions = {};
 
 	// ---------------------------------------------------------------------------
 	// Public API (MetaMask SDK lifecycle and RPC)
@@ -39,11 +39,6 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 *
 	 * Documented options: https://docs.metamask.io/sdk/connect/javascript/
 	 *
-	 * @param {Object} [options]
-	 * @param {{ name?: string; url?: string; iconUrl?: string; }} [options.dappMetadata]
-	 *        Dapp identity shown during connection (trust context)
-	 * @param {string} options.infuraAPIKey
-	 *        Required API key enabling read‑only RPC and load‑balancing
 	 * @param {{ instance?: any; gameObjectName?: string }} [options.unity]
 	 *        Unity wiring: explicit instance and/or callback GameObject name
 	 * @param {{
@@ -62,28 +57,42 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 *        Optional JS-side event callbacks. You can also pass top-level
 	 *        onConnected/onDisconnected/onChainChanged/onSigned/onRequested
 	 *        and corresponding *Error callbacks.
-	 * @param {boolean} [options.debug]
+	 * @param {Object} [options.debug]
 	 *        Enable verbose debug logging
-	 * @param {boolean} [options.checkInstallationImmediately]
-	 *        Immediately checks MetaMask installation on load and may prompt install (default false)
-	 * @param {boolean} [options.checkInstallationOnAllCalls]
-	 *        Checks installation before each RPC call (default false)
-	 * @param {string}  [options.communicationServerUrl]
-	 *        Custom communication server URL (mainly for debugging/testing)
-	 * @param {boolean} [options.enableAnalytics]
-	 *        Sends anonymous analytics to improve SDK (default true)
-	 * @param {boolean} [options.extensionOnly]
-	 *        Prefer and stick to extension when detected (default true)
-	 * @param {boolean} [options.headless]
-	 *        Enables headless mode to use custom UI/modals (default false)
-	 * @param {(link:string)=>void} [options.openDeeplink]
-	 *        Callback to open MetaMask mobile deeplink
-	 * @param {Record<string,string>} [options.readonlyRPCMap]
-	 *        Map of chainId (hex) → RPC URL for read‑only requests
-	 * @param {boolean} [options.shouldShimWeb3]
-	 *        Whether to shim window.web3 with the provider for legacy compatibility (default true)
+	 * @param {Object} [options.sdkOptions]
+	*        Direct SDK options object passed through to MetaMaskSDK. This object
+	*        MUST contain `dappMetadata` and `infuraAPIKey` (required). All other
+	*        SDK options are optional. This list is not exhaustive — see:
+	*        https://docs.metamask.io/sdk/connect/javascript/
+	*
+	*        Common SDK options (examples):
+	*        @param {{ name?: string; url?: string; iconUrl?: string }} [options.sdkOptions.dappMetadata]
+	*            Dapp identity shown during connection
+	*        @param {string} [options.sdkOptions.infuraAPIKey]
+	*            API key enabling read-only RPC
+	*        @param {boolean} [options.sdkOptions.checkInstallationImmediately]
+	*            Check MetaMask installation on load
+	*        @param {boolean} [options.sdkOptions.checkInstallationOnAllCalls]
+	*            Check installation before each RPC call
+	*        @param {string} [options.sdkOptions.communicationServerUrl]
+	*            Custom communication server URL
+	*        @param {boolean} [options.sdkOptions.enableAnalytics]
+	*            Enable anonymous analytics
+	*        @param {boolean} [options.sdkOptions.extensionOnly]
+	*            Prefer extension when detected
+	*        @param {boolean} [options.sdkOptions.headless]
+	*            Enable headless mode for custom UI
+	*        @param {(link:string)=>void} [options.sdkOptions.openDeeplink]
+	*            Callback to open MetaMask mobile deeplink
+	*        @param {boolean} [options.sdkOptions.useDeeplink]
+	*            Prefer and use MetaMask deep links on mobile
+	*        @param {Record<string,string>} [options.sdkOptions.readonlyRPCMap]
+	*            Map of chainId (hex) → RPC URL for read-only requests
+	*        @param {boolean} [options.sdkOptions.shouldShimWeb3]
+	*            Whether to shim window.web3 for legacy compatibility
+	*
 	 * @returns {boolean} True if initialized (or already initialized)
-	 * @throws {Error} When `infuraAPIKey` is missing
+	 * @throws {Error} When `options.sdkOptions.dappMetadata` or `options.sdkOptions.infuraAPIKey` are missing
 	 */
 	function init(options = {}) {
 		try {
@@ -96,7 +105,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			if (options.unity?.gameObjectName)
 				setUnityGameObjectName(String(options.unity.gameObjectName));
 			if (options.unity?.instance) unityInstance = options.unity.instance;
-			log("Unity wiring", { unityGameObjectName, hasInstance: Boolean(unityInstance) });
+
 			// JS event wiring from init options
 			try {
 				const ev = /** @type {any} */ (options.events || {});
@@ -119,30 +128,35 @@ import { MetaMaskSDK } from "@metamask/sdk";
 				}
 			} catch {}
 			
-			
-			const dappMetadata = options.dappMetadata;
-			const infuraAPIKey = options.infuraAPIKey;
+			log("options.sdkOptions", options.sdkOptions);
+			log("options.sdkOptions.dappMetadata", options.sdkOptions?.dappMetadata.name);
+			if (!options.sdkOptions?.dappMetadata.name) throw new Error("MetaMaskBridge.init requires dappMetadata.name");
+			const dappMetadata = options.sdkOptions?.dappMetadata;
+			const infuraAPIKey = options.sdkOptions?.infuraAPIKey;
 			if (!dappMetadata) throw new Error("MetaMaskBridge.init requires dappMetadata");
 			if (!infuraAPIKey) throw new Error("MetaMaskBridge.init requires infuraAPIKey");
 
-			// Construct MetaMask SDK instance (documented fields only and pass-through known options)
-			const sdkOptions = { dappMetadata, infuraAPIKey };
-			if (typeof options.checkInstallationImmediately !== 'undefined') sdkOptions.checkInstallationImmediately = Boolean(options.checkInstallationImmediately);
-			if (typeof options.checkInstallationOnAllCalls !== 'undefined') sdkOptions.checkInstallationOnAllCalls = Boolean(options.checkInstallationOnAllCalls);
-			if (typeof options.communicationServerUrl !== 'undefined') sdkOptions.communicationServerUrl = String(options.communicationServerUrl);
-			if (typeof options.enableAnalytics !== 'undefined') sdkOptions.enableAnalytics = Boolean(options.enableAnalytics);
-			if (typeof options.extensionOnly !== 'undefined') sdkOptions.extensionOnly = Boolean(options.extensionOnly);
-			if (typeof options.headless !== 'undefined') sdkOptions.headless = Boolean(options.headless);
-			if (typeof options.openDeeplink !== 'undefined') sdkOptions.openDeeplink = options.openDeeplink;
-			if (typeof options.readonlyRPCMap !== 'undefined') sdkOptions.readonlyRPCMap = options.readonlyRPCMap;
-			if (typeof options.shouldShimWeb3 !== 'undefined') sdkOptions.shouldShimWeb3 = Boolean(options.shouldShimWeb3);
-			sdk = new MetaMaskSDK(sdkOptions);
+			sdk = new MetaMaskSDK(options.sdkOptions);
 			log("SDK initialized");
 
-			// Subscribe to provider events (idempotent)
-			if (!subscribeProviderEvents(getProvider())) {
-				// ignore error
-			}
+			// // Subscribe to provider events (idempotent)
+			// if (!subscribeProviderEvents(getProvider())) {
+			// 	// ignore error
+			// }
+			
+			// Check connection status after initialization (like in the example)
+			setTimeout(async () => {
+				try {
+					const result = await checkConnection();
+					if (result.success && result.result.connected) {
+						log("init: found existing connection", result.result.address);
+					} else {
+						log("init: no existing connection found");
+					}
+				} catch (e) {
+					log("init: connection check failed", e);
+				}
+			}, 100);
 		} catch (e) {
 			error("init error:", e?.message || e);
 			return { success: false, error: String(e?.message || e) };
@@ -160,6 +174,18 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	async function connect() {
 		try {
 			if (!sdk) throw new Error("MetaMaskBridge not initialized");
+			
+			// Force SDK to reset its internal state - fix of some issues with the SDK on mobile
+			if (sdkOptions) {
+				log("Terminating SDK to reset state");
+				await disconnect();
+				log("Re-initializing SDK");
+				sdk = new MetaMaskSDK(sdkOptions);
+				
+				// Wait a bit for SDK to initialize
+				await new Promise(resolve => setTimeout(resolve, 500));
+			}
+
 			log("connect called");
 			const accounts = (sdk.connect ? await sdk.connect() : await getProvider()?.request({
 				method: "eth_requestAccounts",
@@ -171,8 +197,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			log("connect success:", { addr, count: accounts.length });
 			emitConnected(addr, accounts);
 			// Ensure provider is current and subscribe events
-			provider = getProvider() || provider;
-			if (!subscribeProviderEvents(provider)) {
+			if (!subscribeProviderEvents(getProvider())) {
 				throw new Error("Failed to subscribe to provider events");
 			}
 			return { success: true, result: accounts };
@@ -199,8 +224,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			}
 			const result = await sdk.connectAndSign({ msg: String(message ?? "") });
 			// Ensure provider is set post-connect
-			provider = getProvider() || provider;
-			if (!subscribeProviderEvents(provider)) {
+			if (!subscribeProviderEvents(getProvider())) {
 				throw new Error("Failed to subscribe to provider events");
 			}
 			if (result?.accounts?.length) {
@@ -248,9 +272,11 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	async function disconnect() {
 		try {
 			log("disconnect called");
+			if (isConnected()) {
+				if (sdk?.terminate) await sdk.terminate();
+				emitDisconnected();
+			}
 			lastAddress = "";
-			if (sdk?.terminate) await sdk.terminate();
-			emitDisconnected();
 			return { success: true, result: "" };
 		} catch (e) {
 			error("disconnect error:", e?.message || e);
@@ -268,11 +294,12 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	}
 
 	/**
-	 * Check if there is a cached connected address.
+	 * Check if MetaMask is connected.
 	 * @returns {boolean}
 	 */
 	function isConnected() {
-		return Boolean(lastAddress);
+		return getProvider()?.isConnected();
+		// return Boolean(lastAddress);
 	}
 
 	/**
@@ -297,6 +324,58 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			// Return only serializable fields (omit provider object to avoid circular structure)
 			return { success: true, result: { connected: Boolean(addr), address: addr, accounts: Array.isArray(accounts) ? accounts : [], chainId: chainId ? String(chainId) : null } };
 		} catch (e) {
+			return { success: false, error: String(e?.message || e) };
+		}
+	}
+
+	/**
+	 * Check if MetaMask is connected using eth_accounts method.
+	 * This method checks for available accounts without requesting them,
+	 * allowing us to detect if MetaMask is still connected without prompting the user.
+	 * Uses window.ethereum directly instead of detectEthereumProvider for better compatibility.
+	 * @returns {Promise<{ success: true, result: { connected: boolean, address: string, accounts: string[] } } | { success: false, error: string }>}
+	 */
+	async function checkConnection() {
+		try {
+			const provider = getProvider();
+			
+			if (!provider) {
+				return { success: false, error: "MetaMask not installed" };
+			}
+			
+			if (!provider.isMetaMask) {
+				return { success: false, error: "Provider is not MetaMask" };
+			}
+			
+			subscribeProviderEvents(provider);
+			
+			log("checkConnection called");
+			const accounts = await provider.request({ method: "eth_accounts" });
+			const addr = (Array.isArray(accounts) && accounts[0]) ? String(accounts[0]) : "";
+			const connected = Boolean(addr);
+			
+			// Update cached state if we found an account
+			if (connected && addr !== lastAddress) {
+				lastAddress = addr;
+				log("checkConnection: found connected account", { addr });
+				emitConnected(addr, accounts);
+			} else if (!connected && lastAddress) {
+				// Clear cached state if no accounts found
+				lastAddress = "";
+				log("checkConnection: no accounts found, clearing cached state");
+			}
+			
+			log("checkConnection result:", { connected, addr, accountsCount: accounts.length });
+			return { 
+				success: true, 
+				result: { 
+					connected, 
+					address: addr, 
+					accounts: Array.isArray(accounts) ? accounts : [] 
+				} 
+			};
+		} catch (e) {
+			error("checkConnection error:", e?.message || e);
 			return { success: false, error: String(e?.message || e) };
 		}
 	}
@@ -357,22 +436,27 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	}
 
 	/**
+	 * Generate MetaMask deep link for mobile users
+	 * @returns {string} Deep link URL
+	 */
+	function generateMetaMaskDeepLink() {
+		const currentUrl = window.location.href;
+		// const encodedUrl = encodeURIComponent(currentUrl);
+		return `https://metamask.app.link/dapp/${currentUrl}`;
+	}
+
+	/**
 	 * Wire the Unity instance for callbacks.
 	 *
-	 * @param {any | { instance?: any }} arg Unity instance (raw or wrapped)
+	 * @param {any} instance Unity instance (raw or wrapped)
 	 * @returns {void}
 	 */
-	function setUnityInstance(arg) {
-		log("setUnityInstance called", { type: typeof arg });
+	function setUnityInstance(instance) {
+		log("setUnityInstance called", { type: typeof instance });
 		// Accept raw Unity instance or object with { instance }
-		if (arg && typeof arg === "object" && typeof arg.SendMessage === "function") {
-			unityInstance = arg;
+		if (instance && typeof instance === "object" && typeof instance.SendMessage === "function") {
+			unityInstance = instance;
 			log("Unity instance set (raw)");
-			return;
-		}
-		if (arg && typeof arg === "object" && arg.instance) {
-			unityInstance = arg.instance;
-			log("Unity instance set (wrapped)");
 			return;
 		}
 		log("Unity instance not provided or invalid; leaving unchanged");
@@ -532,7 +616,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	function _logWithStackTrace(consoleMethod, showStackTrace, ...args) {
 		if (showStackTrace) {
 			// Methods that already have stack trace by default
-			const methodsWithDefaultStackTrace = [console.error, console.warn];
+			const methodsWithDefaultStackTrace = [console.log, console.error, console.warn];
 			if (methodsWithDefaultStackTrace.includes(consoleMethod)) {
 				consoleMethod(...args);
 			} else {
@@ -567,7 +651,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 * @returns {boolean} True if a new subscription was applied; false if skipped
 	 */
 	function subscribeProviderEvents(passed) {
-		console.log("subscribeProviderEvents", passed);
+		log("subscribeProviderEvents", passed);
 		const p = passed || getProvider();
 		if (!p) { log("subscribeProviderEvents: provider not available"); return false; }
 		if (subscribedProvider === p) { log("subscribeProviderEvents: already subscribed"); return true; }
@@ -607,9 +691,15 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 * @returns {import('@metamask/providers').MetaMaskInpageProvider | null}
 	 */
 	function getProvider() {
+		let provider = null;
 		try {
-			const p = sdk?.getProvider?.();
-			if (p) provider = p;
+			provider = sdk?.getProvider?.();
+			if (!provider) {
+				provider = window.ethereum;
+				// if (!provider.isMetaMask) {
+				// 	return null;
+				// }
+			}
 		} catch {}
 		return provider;
 	}
@@ -627,11 +717,13 @@ import { MetaMaskSDK } from "@metamask/sdk";
 		isConnected,
 		getConnectionState,
 		getConnectionDetails,
+		checkConnection,
 		setUnityInstance,
 		setUnityGameObjectName,
 		setDebug,
 		on,
 		off,
+		generateMetaMaskDeepLink,
 		emitConnectionDetails,
 		emitConnectionDetailsError,
 		emitConnectError,

@@ -50,10 +50,8 @@ Choose one of the following:
   <script>
     // Initialize bridge BEFORE calling connect/sign/request
     MetaMaskBridge.init({
-      dappMetadata: { name: 'Your App', url: window.location.href },
-      infuraAPIKey: 'YOUR_INFURA_KEY',
-      // Optionally pass callback GameObject and/or Unity instance (if available here)
-      // unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
+      // Unity wiring (optional): callback GameObject and/or Unity instance (if available here)
+      unity: { gameObjectName: 'Web3Bridge', instance: window.unityInstance },
       debug: false,
       // Optional JS-side events (you can also use MetaMaskBridge.on/off later)
       events: {
@@ -67,6 +65,11 @@ Choose one of the following:
         // Connection details emits
         connectionDetails: (res) => console.log('connectionDetails', res),
         connectionDetailsError: (m) => console.warn('connectionDetailsError', m)
+      },
+      // REQUIRED: SDK options object containing dappMetadata and infuraAPIKey
+      sdkOptions: {
+        dappMetadata: { name: 'Your App', url: window.location.href },
+        infuraAPIKey: 'YOUR_INFURA_KEY'
       }
     });
   </script>
@@ -88,8 +91,10 @@ Choose one of the following:
 ```csharp
 // Initialize (JSON options)
 bool ok = Web3MetaMaskJsBridge.Init(JsonUtility.ToJson(new {
-  dappMetadata = new { name = "Your App", url = Application.absoluteURL },
-  infuraAPIKey = "YOUR_INFURA_KEY",
+  sdkOptions = new {
+    dappMetadata = new { name = "Your App", url = Application.absoluteURL },
+    infuraAPIKey = "YOUR_INFURA_KEY"
+  },
   debug = true,
   unity = new { gameObjectName = gameObject.name }
 }));
@@ -142,11 +147,13 @@ void OnConnectionDetailsError(string error) { }
 
 ## JavaScript Bridge API (global `MetaMaskBridge`)
 - `init(options)` — must be called first; required options:
-  - `dappMetadata` (required): shows your dapp name/url/icon during connection (trust context)
-  - `infuraAPIKey` (required): enables read‑only RPC and load‑balancing
+  - `sdkOptions` (required): SDK options object containing:
+    - `dappMetadata` (required): shows your dapp name/url/icon during connection (trust context)
+    - `infuraAPIKey` (required): enables read‑only RPC and load‑balancing
   - `unity.gameObjectName` (optional): GameObject name for callbacks
   - `unity.instance` (optional): pass Unity instance if available
   - `debug` (optional): enable/disable bridge logs
+  - `events` (optional): JS-side event callbacks
 - `connect()` / `disconnect()`
 - `connectAndSign(message)` — connect and sign in one step if supported
 - `connectWith({ method, params? })` — connect and make a JSON‑RPC in one step
@@ -156,6 +163,8 @@ void OnConnectionDetailsError(string error) { }
 - `isConnected()` — whether an address is cached as connected
 - `getConnectionState()` — returns `{ connected, address }`
 - `getConnectionDetails()` — Promise resolving `{ success, result?: { connected, address, accounts, chainId }, error?: string }`
+- `checkConnection()` — Promise resolving `{ success, result?: { connected, address, accounts }, error?: string }`
+- `generateMetaMaskDeepLink()` — returns MetaMask mobile deeplink URL
 - `setUnityInstance({ instance? })`
 - `setUnityGameObjectName(name)` — set callback target GameObject name
 - `setDebug(enabled)` — enable verbose logging in the bridge

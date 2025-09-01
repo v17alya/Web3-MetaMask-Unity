@@ -2,6 +2,37 @@
 
 All notable changes to this package will be documented in this file.
 
+## [0.1.4] - 2025-01-27
+### Added
+- **New JavaScript bridge methods:**
+  - `checkConnection()` - checks MetaMask connection status without prompting user, returns `{ success, result?: { connected, address, accounts }, error?: string }`
+  - `generateMetaMaskDeepLink()` - generates mobile deeplink URL for current page, returns `string`
+- **Enhanced connection management:** automatic connection status checking after initialization for better UX
+
+### Changed
+- **Breaking change in `init()` method:**
+  - Return type changed from `boolean` to `{ success: boolean, result?: any, error?: string }`
+  - Required options restructured: `dappMetadata` and `infuraAPIKey` moved to `sdkOptions` object
+  - New structure: `init({ unity?, debug?, events?, sdkOptions: { dappMetadata, infuraAPIKey } })`
+- **Improved error handling:** init method now provides detailed success/error responses
+- **Better mobile support:** enhanced deeplink generation for cross-platform compatibility
+
+### Refactored
+- **Documentation structure:** updated all README files to reflect new API structure
+- **Code examples:** modernized JavaScript and C# initialization examples
+- **API documentation:** comprehensive coverage of new methods and updated signatures
+
+### Fixed
+- **Initialization flow:** resolved issues with required parameters validation
+- **Mobile compatibility:** improved MetaMask mobile app integration via deeplinks
+- **Connection state management:** better handling of existing connections on page load
+
+### Updated Sample
+- **Web3MetaMaskSampleMinimal:** updated to use new init method structure
+- **Template examples:** modernized HTML/JS initialization code
+- **C# integration:** updated Unity-side examples to match new JSON structure
+- **Documentation:** comprehensive setup and usage instructions
+
 ## [0.1.3] - 2025-08-28
 ### Added
 - WebGL interop: added `W3MM_IsInitialized` in `.jslib` returning 1/0 from `window.MetaMaskBridge.isInitialized()`.

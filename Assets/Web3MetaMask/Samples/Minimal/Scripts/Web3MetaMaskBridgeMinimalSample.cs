@@ -10,13 +10,16 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
     public class Web3MetaMaskBridgeMinimalSample : MonoBehaviour
     {
         [System.Serializable]
+        private class SdkOptions { public DappMetadata dappMetadata; public string infuraAPIKey; }
+
+        [System.Serializable]
         private class DappMetadata { public string name; public string url; }
 
         [System.Serializable]
         public class UnityOptions { public string gameObjectName; }
 
         [System.Serializable]
-        private class InitOptions { public DappMetadata dappMetadata; public string infuraAPIKey; public bool debug; public UnityOptions unity; }
+        private class InitOptions { public SdkOptions sdkOptions; public UnityOptions unity; public bool debug; }
 
         [SerializeField] private string _dappName = "MetaMask Sample";
         [SerializeField] private string _dappUrl = "http://localhost";
@@ -28,6 +31,8 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
         [SerializeField][TextArea(2, 6)] private string _connectWithParamsJson = "[]";
         [SerializeField] private bool _showConnectionStateButtons = true;
         private string _lastLog = string.Empty;
+        private bool _lastFocusState = false;
+        private bool _htmlInputHasFocus = false;
 
         #region Public API
 
@@ -115,6 +120,9 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
 
         private void OnGUI()
         {
+            // Manage keyboard input capture based on focus
+            ManageKeyboardInputCapture();
+            
             const int pad = 8; int w = 300, h = 24;
             int total = (h + pad) * 16 + pad; // buttons + inputs
             int x = (Screen.width - w) / 2;
@@ -165,6 +173,35 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
 
         #endregion
 
+        #region Input Management
+
+        /// <summary>
+        /// Manages WebGLInput.captureAllKeyboardInput based on whether Unity GUI elements have focus.
+        /// </summary>
+        private void ManageKeyboardInputCapture()
+        {
+            var hasFocus = !_htmlInputHasFocus;
+            WebGLInput.captureAllKeyboardInput = hasFocus;
+            
+            // Optional: Log focus changes for debugging
+            if (_lastFocusState != hasFocus)
+            {
+                _lastFocusState = hasFocus;
+                Debug.Log($"[Web3Bridge] Keyboard capture: {(hasFocus ? "ENABLED" : "DISABLED")} (Unity focus: {hasFocus}, HTML focus: {_htmlInputHasFocus})");
+            }
+        }
+
+        /// <summary>
+        /// Called from JavaScript when HTML input gains focus.
+        /// </summary>
+        public void OnHtmlInputFocus(string hasFocus)
+        {
+            _htmlInputHasFocus = hasFocus.ToLower() == "true";
+            Debug.Log($"[Web3Bridge] HTML input focus: {_htmlInputHasFocus}");
+        }
+
+        #endregion
+
         #region Helpers
 
         /// <summary>
@@ -209,10 +246,9 @@ namespace Gamenator.Web3.MetaMaskUnity.Samples
         {
             var options = new InitOptions
             {
-                dappMetadata = new DappMetadata { name = _dappName ?? string.Empty, url = _dappUrl ?? string.Empty },
-                infuraAPIKey = _infuraApiKey ?? string.Empty,
+                sdkOptions = new SdkOptions { dappMetadata = new DappMetadata { name = _dappName ?? null, url = _dappUrl ?? null }, infuraAPIKey = _infuraApiKey ?? null},
+                unity = new UnityOptions { gameObjectName = gameObject.name },
                 debug = true,
-                unity = new UnityOptions { gameObjectName = gameObject.name }
             };
             return JsonUtility.ToJson(options);
         }

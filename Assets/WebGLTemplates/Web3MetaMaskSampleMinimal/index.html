@@ -7,18 +7,6 @@
     <title>{{{ PRODUCT_NAME }}}</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
-    <style>
-      #controls { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; background: rgba(12,14,22,0.92); padding: 12px; border-bottom: 1px solid #3b4160; box-shadow: 0 6px 16px rgba(0,0,0,0.35); transform: translateY(0); transition: transform .22s ease; }
-      #controls.collapsed { transform: translateY(-110%); pointer-events: none; }
-      #controls .group { display: flex; flex-direction: column; gap: 6px; }
-      #controls label { font: 12px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu; color: #b9c0ff; }
-      #controls input, #controls textarea { width: 100%; box-sizing: border-box; background: #1e2235; color: #e8eaff; border: 1px solid #3b4160; border-radius: 6px; padding: 6px 8px; font-size: 12px; }
-      #controls textarea { min-height: 58px; resize: vertical; }
-      #controls button { background: #2a2f45; border: 1px solid #3b4160; color: #e8eaff; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
-      #controls button:hover { background: #363d5a; }
-      #controls-toggle { position: fixed; top: 8px; right: 8px; z-index: 11; background: #2a2f45; border: 1px solid #3b4160; color: #e8eaff; padding: 6px 10px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-      #controls.collapsed + #controls-toggle { top: 8px; }
-    </style>
     <script src="src/web3-metamask/web3-metamask-bridge.js"></script>
   </head>
   <body class="{{{ SPLASH_SCREEN_STYLE.toLowerCase() }}}">
@@ -65,10 +53,13 @@
         <button onclick="checkIsConnected()">IsConnected?</button>
         <button onclick="getConnState()">GetConnectionState</button>
         <button onclick="getConnDetails()">GetConnectionDetails</button>
+        <button onclick="checkConnection()">CheckConnection</button>
+        <button onclick="testGenerateLink()">Generate Deep Link</button>
       </div>
     </div>
     <button id="controls-toggle" onclick="togglePanel()">Hide Panel</button>
 
+    <!-- Unity container -->
     <div id="unity-container" class="unity-desktop">
       <canvas id="unity-canvas"></canvas>
     </div>
@@ -82,6 +73,35 @@
       </div>
     </div>
     <div id="unity-fullscreen-button" style="display: none;"></div>
+
+    <!-- MetaMask modal -->
+    <script>
+      // Dynamically load MetaMask modal script only on mobile devices
+      (function() {
+        function isMobileDevice() {
+          return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        }
+        
+        if (isMobileDevice()) {
+          var script = document.createElement('script');
+          script.src = 'src/web3-metamask/metamask-modal.js';
+          script.onload = function() {
+            // Initialize modal with custom options if needed
+            if (window.MetaMaskModal) {
+              window.MetaMaskModal.init({
+                onInstall: function() {
+                  window.open('https://metamask.io/download/', '_blank');
+                },
+                onCancel: function() {
+                  console.log('User cancelled MetaMask installation');
+                }
+              });
+            }
+          };
+          document.head.appendChild(script);
+        }
+      })();
+    </script>
 
     <!-- MetaMask: helpers and quick-start flows -->
     <script>
@@ -101,6 +121,7 @@
         try { localStorage.setItem('mmPanelCollapsed', collapsed ? '1' : '0'); } catch {}
       }
       (function restorePanelState(){ try { const v = localStorage.getItem('mmPanelCollapsed'); if (v === '1') { const panel = document.getElementById('controls'); panel.classList.add('collapsed'); const btn = document.getElementById('controls-toggle'); btn.textContent = 'Show Panel'; } } catch {} })();
+
       /**
        * Initialize MetaMaskBridge with user-provided options.
        * Recommendation: set your Infura key and recognizable dapp metadata.
@@ -111,8 +132,10 @@
         const dappUrl = document.getElementById('dappUrl').value.trim() || window.location.href;
         try {
           MetaMaskBridge.init({
-            dappMetadata: { name: dappName, url: dappUrl },
-            infuraAPIKey: infura,
+            sdkOptions: {
+              dappMetadata: { name: dappName, url: dappUrl },
+              infuraAPIKey: infura,
+            },
             debug: true,
             unity: {
               gameObjectName: gameObjectName
@@ -138,7 +161,10 @@
         } catch (e) { console.error('Bridge init error:', e); }
       }
       /** Start/stop a wallet session */
-      function connect() { try { MetaMaskBridge.connect(); } catch (e) { console.error(e); } }
+      function connect() { 
+        try { if (window.MetaMaskModal && MetaMaskModal.showIfNeeded()) return; } catch(_) {}
+        try { MetaMaskBridge.connect(); } catch (e) { console.error(e); } 
+      }
       function disconnectAll() { try { MetaMaskBridge.disconnect(); } catch (e) { console.error(e); } }
       /** Sign an arbitrary message with the connected account */
       function sign() { const m = document.getElementById('msg').value || 'Hello from HTML'; try { MetaMaskBridge.signMessage(m); } catch (e) { console.error(e); } }
@@ -173,6 +199,8 @@
       function checkIsConnected() { try { const ok = MetaMaskBridge.isConnected(); console.log('[MetaMaskBridge] isConnected:', ok); alert('isConnected: ' + ok); } catch (e) { console.error(e); } }
       function getConnState() { try { const s = MetaMaskBridge.getConnectionState(); console.log('[MetaMaskBridge] state:', s); alert('state: ' + JSON.stringify(s)); } catch (e) { console.error(e); } }
       function getConnDetails() { try { MetaMaskBridge.getConnectionDetails().then(r => { console.log('[MetaMaskBridge] details:', r); alert('details: ' + JSON.stringify(r)); }).catch(console.error); } catch (e) { console.error(e); } }
+      function checkConnection() { try { MetaMaskBridge.checkConnection().then(r => { console.log('[MetaMaskBridge] checkConnection:', r); alert('checkConnection: ' + JSON.stringify(r)); }).catch(console.error); } catch (e) { console.error(e); } }
+      function testGenerateLink() { try { const link = MetaMaskBridge.generateMetaMaskDeepLink(); console.log('[MetaMaskBridge] Generated link:', link); alert('Generated link: ' + link); } catch (e) { console.error(e); } }
 
       /**
        * Read text from browser clipboard and forward to Unity clipboard via SendMessage.
@@ -261,7 +289,7 @@
           // Wire Unity instance to bridge
           try { 
             MetaMaskBridge.setUnityGameObjectName(gameObjectName);
-            MetaMaskBridge.setUnityInstance({ instance: unityInstance }); 
+            MetaMaskBridge.setUnityInstance(unityInstance); 
           } catch (e) { console.warn('setUnityInstance failed', e); }
         }).catch((message) => {
           alert(message);

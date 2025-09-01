@@ -27,6 +27,24 @@ function run(cmd, opts = {}) {
   execSync(cmd, { stdio: 'inherit', ...opts });
 }
 
+function runNpm(cmd, nodePath, opts = {}) {
+  // Use npm through the provided node path by setting PATH
+  if (nodePath) {
+    const nodeDir = path.dirname(nodePath);
+    const npmPath = path.join(nodeDir, 'npm');
+    
+    // Set PATH to include the directory where node is located
+    const env = { ...process.env };
+    env.PATH = `${nodeDir}:${env.PATH || ''}`;
+    
+    console.log(`$ ${cmd} (using PATH: ${nodeDir})`);
+    execSync(cmd, { stdio: 'inherit', env, ...opts });
+  } else {
+    console.log(`$ ${cmd}`);
+    execSync(cmd, { stdio: 'inherit', ...opts });
+  }
+}
+
 function runCapture(cmd, opts = {}) {
   return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
 }
@@ -80,6 +98,14 @@ function normalizeBranch(input) {
 
 function gitCheckoutOrTrack(branch) {
   const b = normalizeBranch(branch);
+  const currentBranch = gitCurrentBranch();
+  
+  // If we're already on the target branch, do nothing
+  if (currentBranch === b) {
+    console.log(`Already on branch: ${b}`);
+    return;
+  }
+  
   if (gitBranchExistsLocal(b)) {
     gitCheckout(b);
     return;
@@ -126,9 +152,19 @@ function bumpVersion(newVersion) {
   console.log(`Version bumped: ${oldVersion} -> ${newVersion}`);
 }
 
-function buildBridge() {
-  run('npm ci', { cwd: bridgeRoot });
-  run('npm run package:zip', { cwd: bridgeRoot });
+function buildBridge(npmPathOverride, nodePath) {
+  const npmPath = resolveNpmPath(npmPathOverride);
+  console.log(`Using npm at: ${npmPath}`);
+  
+  if (nodePath) {
+    // Use npm through the provided node path
+    runNpm('npm ci', nodePath, { cwd: bridgeRoot });
+    runNpm('npm run package:zip', nodePath, { cwd: bridgeRoot });
+  } else {
+    // Fallback to direct npm commands
+    run(`${npmPath} ci`, { cwd: bridgeRoot });
+    run(`${npmPath} run package:zip`, { cwd: bridgeRoot });
+  }
 }
 
 function copyArtifacts() {
@@ -167,7 +203,57 @@ function resolveUnityPath(cliUnityPath) {
   return 'Unity';
 }
 
-function exportUnityPackage(cliUnityPath) {
+function resolveNpmPath(overridePath) {
+  // Use override if provided
+  if (overridePath && fs.existsSync(overridePath)) {
+    return overridePath;
+  }
+
+  // Check if npm is available in PATH
+  try {
+    const npmVersion = runCapture('npm --version');
+    if (npmVersion) {
+      return 'npm';
+    }
+  } catch {}
+
+  // Common macOS locations for npm
+  const nodePaths = [
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/usr/bin',
+    process.env.PATH?.split(':').filter(Boolean) || []
+  ].flat();
+
+  for (const nodePath of nodePaths) {
+    const npmPath = path.join(nodePath, 'npm');
+    if (fs.existsSync(npmPath)) {
+      return npmPath;
+    }
+  }
+
+  // Try to find npm relative to node
+  try {
+    const nodePath = runCapture('which node');
+    if (nodePath) {
+      const npmPath = path.join(path.dirname(nodePath), 'npm');
+      if (fs.existsSync(npmPath)) {
+        return npmPath;
+      }
+    }
+  } catch {}
+
+  throw new Error('npm not found. Please ensure Node.js is installed and accessible.');
+}
+
+function exportUnityPackage(cliUnityPath, closeUnity = false) {
+  if (closeUnity) {
+    console.log('Unity export requested with --close-unity flag.');
+    console.log('Please close Unity Editor manually and run the release script again with --skip-unity to continue.');
+    console.log('Or run the Unity export manually from the menu: Tools/Web3/MetaMask/Export Minimal Sample UnityPackage');
+    return;
+  }
+  
   const unity = resolveUnityPath(cliUnityPath);
   const projectPath = projectRoot;
   const method = 'Gamenator.Web3.MetaMaskUnity.Editor.SampleExporter.ExportMinimalSampleCli';
@@ -194,6 +280,12 @@ function parseArgs() {
       out.skipBridge = true;
     } else if (a === '--unity') {
       out.unityPath = process.argv[++i];
+    } else if (a === '--npm') {
+      out.npmPath = process.argv[++i];
+    } else if (a === '--node') {
+      out.nodePath = process.argv[++i];
+    } else if (a === '--close-unity') {
+      out.closeUnity = true;
     } else if (a === '--branch' || a === '-b') {
       out.branch = process.argv[++i];
     } else if (a === '--no-git') {
@@ -204,7 +296,7 @@ function parseArgs() {
 }
 
 async function main() {
-  const { version, skipUnity, skipBridge, unityPath, branch, noGit } = parseArgs();
+  const { version, skipUnity, skipBridge, unityPath, npmPath, nodePath, branch, noGit, closeUnity } = parseArgs();
   if (!version) throw new Error('Missing --version');
 
   if (!noGit) {
@@ -215,13 +307,13 @@ async function main() {
 
   bumpVersion(version);
   if (!skipBridge) {
-    buildBridge();
+    buildBridge(npmPath, nodePath);
     copyArtifacts();
   } else {
     console.log('Skipping bridge build and artifact copy.');
   }
   if (!skipUnity) {
-    exportUnityPackage(unityPath);
+    exportUnityPackage(unityPath, closeUnity);
   }
 
   if (!noGit) {
