@@ -2,10 +2,19 @@
 
 All notable changes to this package will be documented in this file.
 
-## [0.1.5] - 2025-01-27
+## [0.1.7] - 2025-01-27
+### Changed
+- **Bridge:** connection fixes
+
+## [0.1.6] - 2025-01-27
 ### Changed
 - **Reduced connection delay:** decreased waiting time after disconnect when attempting to reconnect for improved user experience
 - **Sample improvements:** minor fixes and optimizations to the Web3MetaMaskSampleMinimal sample
+
+## [0.1.5] - 2025-01-27
+### Fixed
+- **Sample:** fix html input collisions
+- **Bridge:** fix getProvider method
 
 ## [0.1.4] - 2025-01-27
 ### Added

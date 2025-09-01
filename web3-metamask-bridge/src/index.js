@@ -129,7 +129,6 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			} catch {}
 			
 			log("options.sdkOptions", options.sdkOptions);
-			log("options.sdkOptions.dappMetadata", options.sdkOptions?.dappMetadata.name);
 			if (!options.sdkOptions?.dappMetadata.name) throw new Error("MetaMaskBridge.init requires dappMetadata.name");
 			const dappMetadata = options.sdkOptions?.dappMetadata;
 			const infuraAPIKey = options.sdkOptions?.infuraAPIKey;
@@ -137,6 +136,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			if (!infuraAPIKey) throw new Error("MetaMaskBridge.init requires infuraAPIKey");
 
 			sdk = new MetaMaskSDK(options.sdkOptions);
+			sdkOptions = options.sdkOptions;
 			log("SDK initialized");
 
 			// // Subscribe to provider events (idempotent)
@@ -176,15 +176,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			if (!sdk) throw new Error("MetaMaskBridge not initialized");
 			
 			// Force SDK to reset its internal state - fix of some issues with the SDK on mobile
-			if (sdkOptions) {
-				log("Terminating SDK to reset state");
-				await disconnect();
-				log("Re-initializing SDK");
-				sdk = new MetaMaskSDK(sdkOptions);
-				
-				// Wait a bit for SDK to initialize
-				await new Promise(resolve => setTimeout(resolve, 150));
-			}
+			await reinitializeSdk();
 
 			log("connect called");
 			const accounts = (sdk.connect ? await sdk.connect() : await getProvider()?.request({
@@ -218,6 +210,10 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	async function connectAndSign(message) {
 		try {
 			if (!sdk) throw new Error("MetaMaskBridge not initialized");
+
+			// Force SDK to reset its internal state - fix of some issues with the SDK on mobile
+			await reinitializeSdk();
+
 			log("connectAndSign called");
 			if (!sdk.connectAndSign) {
 				throw new Error("connectAndSign is not supported by this SDK version");
@@ -249,6 +245,10 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	async function connectWith(rpc) {
 		try {
 			if (!sdk) throw new Error("MetaMaskBridge not initialized");
+
+			// Force SDK to reset its internal state - fix of some issues with the SDK on mobile
+			await reinitializeSdk();
+
 			log("connectWith called", rpc);
 			if (!sdk.connectWith) {
 				throw new Error("connectWith is not supported by this SDK version");
@@ -702,6 +702,18 @@ import { MetaMaskSDK } from "@metamask/sdk";
 			}
 		} catch {}
 		return provider;
+	}
+
+	async function reinitializeSdk() {
+		log("Re-initializing SDK, sdkOptions:", sdkOptions);
+		if (sdkOptions) {
+			log("Terminating SDK to reset state");
+			await disconnect();
+			sdk = new MetaMaskSDK(sdkOptions);
+			
+			// Wait a bit for SDK to initialize
+			await new Promise(resolve => setTimeout(resolve, 150));
+		}
 	}
 
 	// Public API exposed to the template and Unity
