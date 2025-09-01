@@ -28,10 +28,21 @@ function run(cmd, opts = {}) {
 }
 
 function runNpm(cmd, nodePath, opts = {}) {
-  // Use npm through the provided node path
-  const npmCmd = nodePath ? `${nodePath} -e "require('child_process').execSync('${cmd}', {stdio: 'inherit'})"` : cmd;
-  console.log(`$ ${npmCmd}`);
-  execSync(npmCmd, { stdio: 'inherit', ...opts });
+  // Use npm through the provided node path by setting PATH
+  if (nodePath) {
+    const nodeDir = path.dirname(nodePath);
+    const npmPath = path.join(nodeDir, 'npm');
+    
+    // Set PATH to include the directory where node is located
+    const env = { ...process.env };
+    env.PATH = `${nodeDir}:${env.PATH || ''}`;
+    
+    console.log(`$ ${cmd} (using PATH: ${nodeDir})`);
+    execSync(cmd, { stdio: 'inherit', env, ...opts });
+  } else {
+    console.log(`$ ${cmd}`);
+    execSync(cmd, { stdio: 'inherit', ...opts });
+  }
 }
 
 function runCapture(cmd, opts = {}) {
