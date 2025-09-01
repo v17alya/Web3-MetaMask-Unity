@@ -27,6 +27,13 @@ function run(cmd, opts = {}) {
   execSync(cmd, { stdio: 'inherit', ...opts });
 }
 
+function runNpm(cmd, nodePath, opts = {}) {
+  // Use npm through the provided node path
+  const npmCmd = nodePath ? `${nodePath} -e "require('child_process').execSync('${cmd}', {stdio: 'inherit'})"` : cmd;
+  console.log(`$ ${npmCmd}`);
+  execSync(npmCmd, { stdio: 'inherit', ...opts });
+}
+
 function runCapture(cmd, opts = {}) {
   return execSync(cmd, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
 }
@@ -134,12 +141,19 @@ function bumpVersion(newVersion) {
   console.log(`Version bumped: ${oldVersion} -> ${newVersion}`);
 }
 
-function buildBridge(npmPathOverride) {
+function buildBridge(npmPathOverride, nodePath) {
   const npmPath = resolveNpmPath(npmPathOverride);
   console.log(`Using npm at: ${npmPath}`);
   
-  run(`${npmPath} ci`, { cwd: bridgeRoot });
-  run(`${npmPath} run package:zip`, { cwd: bridgeRoot });
+  if (nodePath) {
+    // Use npm through the provided node path
+    runNpm('npm ci', nodePath, { cwd: bridgeRoot });
+    runNpm('npm run package:zip', nodePath, { cwd: bridgeRoot });
+  } else {
+    // Fallback to direct npm commands
+    run(`${npmPath} ci`, { cwd: bridgeRoot });
+    run(`${npmPath} run package:zip`, { cwd: bridgeRoot });
+  }
 }
 
 function copyArtifacts() {
@@ -250,6 +264,8 @@ function parseArgs() {
       out.unityPath = process.argv[++i];
     } else if (a === '--npm') {
       out.npmPath = process.argv[++i];
+    } else if (a === '--node') {
+      out.nodePath = process.argv[++i];
     } else if (a === '--branch' || a === '-b') {
       out.branch = process.argv[++i];
     } else if (a === '--no-git') {
@@ -260,7 +276,7 @@ function parseArgs() {
 }
 
 async function main() {
-  const { version, skipUnity, skipBridge, unityPath, npmPath, branch, noGit } = parseArgs();
+  const { version, skipUnity, skipBridge, unityPath, npmPath, nodePath, branch, noGit } = parseArgs();
   if (!version) throw new Error('Missing --version');
 
   if (!noGit) {
@@ -271,7 +287,7 @@ async function main() {
 
   bumpVersion(version);
   if (!skipBridge) {
-    buildBridge(npmPath);
+    buildBridge(npmPath, nodePath);
     copyArtifacts();
   } else {
     console.log('Skipping bridge build and artifact copy.');

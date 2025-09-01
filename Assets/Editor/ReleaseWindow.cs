@@ -77,6 +77,8 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
                 UnityEngine.Debug.LogError("Unable to find Node.js binary. Specify 'Node Path' explicitly in the window.");
                 return;
             }
+            
+            UnityEngine.Debug.Log($"Using Node.js at: {nodePath}");
 
             // Resolve npm path
             string resolvedNpmPath = npmPathOverride;
@@ -95,7 +97,7 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
             }
 
             // Build args
-            string args = $"\"{scriptPath}\" --version {version} --branch {branch}";
+            string args = $"\"{scriptPath}\" --version {version} --branch {branch} --node \"{nodePath}\"";
             if (skipUnity)
             {
                 args += " --skip-unity";
