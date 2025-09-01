@@ -16,6 +16,7 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
         private string _featureBranch = "feature/x.y.z";
         private string _unityPathOverride = string.Empty;
         private string _nodePathOverride = string.Empty;
+        private string _npmPathOverride = string.Empty;
         private bool _skipUnityExport = false;
         private bool _skipBridgeBuild = false;
 
@@ -23,7 +24,7 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
         public static void Open()
         {
             var wnd = GetWindow<ReleaseWindow>(utility: false, title: "Web3 MetaMask Release", focus: true);
-            wnd.minSize = new Vector2(480, 220);
+            wnd.minSize = new Vector2(480, 250);
             wnd.Show();
         }
 
@@ -34,20 +35,21 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
             _featureBranch = EditorGUILayout.TextField("Feature Branch", _featureBranch);
             _unityPathOverride = EditorGUILayout.TextField("Unity Path (optional)", _unityPathOverride);
             _nodePathOverride = EditorGUILayout.TextField("Node Path (optional)", _nodePathOverride);
+            _npmPathOverride = EditorGUILayout.TextField("NPM Path (optional)", _npmPathOverride);
             _skipUnityExport = EditorGUILayout.ToggleLeft("Skip Unity Export (only bump/build/copy)", _skipUnityExport);
             _skipBridgeBuild = EditorGUILayout.ToggleLeft("Skip Bridge Build (use existing dist)", _skipBridgeBuild);
 
             GUILayout.Space(8);
             if (GUILayout.Button("Run Release"))
             {
-                RunRelease(_version, _featureBranch, _unityPathOverride, _nodePathOverride, _skipUnityExport, _skipBridgeBuild);
+                RunRelease(_version, _featureBranch, _unityPathOverride, _nodePathOverride, _npmPathOverride, _skipUnityExport, _skipBridgeBuild);
             }
 
             GUILayout.Space(6);
             EditorGUILayout.HelpBox("This will bump version in package.json, build the JS bridge, copy artifacts to the project, optionally export the Minimal Sample, then squash-merge the feature branch into main, create the tag and push.", MessageType.Info);
         }
 
-        private static void RunRelease(string version, string branch, string unityPathOverride, string nodePathOverride, bool skipUnity, bool skipBridge)
+        private static void RunRelease(string version, string branch, string unityPathOverride, string nodePathOverride, string npmPathOverride, bool skipUnity, bool skipBridge)
         {
             if (string.IsNullOrWhiteSpace(version))
             {
@@ -76,6 +78,22 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
                 return;
             }
 
+            // Resolve npm path
+            string resolvedNpmPath = npmPathOverride;
+            if (string.IsNullOrWhiteSpace(resolvedNpmPath))
+            {
+                resolvedNpmPath = ResolveNpmPath(string.Empty);
+            }
+            
+            if (string.IsNullOrWhiteSpace(resolvedNpmPath) && !skipBridge)
+            {
+                UnityEngine.Debug.LogWarning("npm not found. Bridge build may fail. Consider specifying 'NPM Path' explicitly.");
+            }
+            else if (!string.IsNullOrWhiteSpace(resolvedNpmPath) && string.IsNullOrWhiteSpace(npmPathOverride))
+            {
+                UnityEngine.Debug.Log($"Auto-detected npm at: {resolvedNpmPath}");
+            }
+
             // Build args
             string args = $"\"{scriptPath}\" --version {version} --branch {branch}";
             if (skipUnity)
@@ -89,6 +107,11 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
             if (!string.IsNullOrWhiteSpace(unityPathOverride))
             {
                 args += $" --unity \"{unityPathOverride}\"";
+            }
+            // Use resolved npm path
+            if (!string.IsNullOrWhiteSpace(resolvedNpmPath))
+            {
+                args += $" --npm \"{resolvedNpmPath}\"";
             }
 
             // Prefer npm exec node to respect workspace Node
@@ -158,6 +181,52 @@ namespace Gamenator.Web3.MetaMaskUnity.Editor
                 {
                     if (File.Exists(p)) return p;
                 }
+            }
+            catch { }
+            return string.Empty;
+        }
+
+        private static string ResolveNpmPath(string overridePath)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
+                {
+                    return overridePath;
+                }
+
+                var envNpm = Environment.GetEnvironmentVariable("NPM_PATH");
+                if (!string.IsNullOrWhiteSpace(envNpm) && File.Exists(envNpm))
+                {
+                    return envNpm;
+                }
+
+                // Common macOS locations
+                string[] candidates = new[]
+                {
+                    "/opt/homebrew/bin/npm",
+                    "/usr/local/bin/npm",
+                    "/usr/bin/npm"
+                };
+                foreach (var p in candidates)
+                {
+                    if (File.Exists(p)) return p;
+                }
+
+                // Try to find npm relative to node
+                try
+                {
+                    var nodePath = ResolveNodePath(string.Empty);
+                    if (!string.IsNullOrWhiteSpace(nodePath))
+                    {
+                        var npmPath = Path.Combine(Path.GetDirectoryName(nodePath)!, "npm");
+                        if (File.Exists(npmPath))
+                        {
+                            return npmPath;
+                        }
+                    }
+                }
+                catch { }
             }
             catch { }
             return string.Empty;

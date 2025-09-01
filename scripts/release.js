@@ -134,9 +134,12 @@ function bumpVersion(newVersion) {
   console.log(`Version bumped: ${oldVersion} -> ${newVersion}`);
 }
 
-function buildBridge() {
-  run('npm ci', { cwd: bridgeRoot });
-  run('npm run package:zip', { cwd: bridgeRoot });
+function buildBridge(npmPathOverride) {
+  const npmPath = resolveNpmPath(npmPathOverride);
+  console.log(`Using npm at: ${npmPath}`);
+  
+  run(`${npmPath} ci`, { cwd: bridgeRoot });
+  run(`${npmPath} run package:zip`, { cwd: bridgeRoot });
 }
 
 function copyArtifacts() {
@@ -175,6 +178,49 @@ function resolveUnityPath(cliUnityPath) {
   return 'Unity';
 }
 
+function resolveNpmPath(overridePath) {
+  // Use override if provided
+  if (overridePath && fs.existsSync(overridePath)) {
+    return overridePath;
+  }
+
+  // Check if npm is available in PATH
+  try {
+    const npmVersion = runCapture('npm --version');
+    if (npmVersion) {
+      return 'npm';
+    }
+  } catch {}
+
+  // Common macOS locations for npm
+  const nodePaths = [
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/usr/bin',
+    process.env.PATH?.split(':').filter(Boolean) || []
+  ].flat();
+
+  for (const nodePath of nodePaths) {
+    const npmPath = path.join(nodePath, 'npm');
+    if (fs.existsSync(npmPath)) {
+      return npmPath;
+    }
+  }
+
+  // Try to find npm relative to node
+  try {
+    const nodePath = runCapture('which node');
+    if (nodePath) {
+      const npmPath = path.join(path.dirname(nodePath), 'npm');
+      if (fs.existsSync(npmPath)) {
+        return npmPath;
+      }
+    }
+  } catch {}
+
+  throw new Error('npm not found. Please ensure Node.js is installed and accessible.');
+}
+
 function exportUnityPackage(cliUnityPath) {
   const unity = resolveUnityPath(cliUnityPath);
   const projectPath = projectRoot;
@@ -202,6 +248,8 @@ function parseArgs() {
       out.skipBridge = true;
     } else if (a === '--unity') {
       out.unityPath = process.argv[++i];
+    } else if (a === '--npm') {
+      out.npmPath = process.argv[++i];
     } else if (a === '--branch' || a === '-b') {
       out.branch = process.argv[++i];
     } else if (a === '--no-git') {
@@ -212,7 +260,7 @@ function parseArgs() {
 }
 
 async function main() {
-  const { version, skipUnity, skipBridge, unityPath, branch, noGit } = parseArgs();
+  const { version, skipUnity, skipBridge, unityPath, npmPath, branch, noGit } = parseArgs();
   if (!version) throw new Error('Missing --version');
 
   if (!noGit) {
@@ -223,7 +271,7 @@ async function main() {
 
   bumpVersion(version);
   if (!skipBridge) {
-    buildBridge();
+    buildBridge(npmPath);
     copyArtifacts();
   } else {
     console.log('Skipping bridge build and artifact copy.');
