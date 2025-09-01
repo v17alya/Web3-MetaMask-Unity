@@ -183,7 +183,7 @@ import { MetaMaskSDK } from "@metamask/sdk";
 				sdk = new MetaMaskSDK(sdkOptions);
 				
 				// Wait a bit for SDK to initialize
-				await new Promise(resolve => setTimeout(resolve, 500));
+				await new Promise(resolve => setTimeout(resolve, 150));
 			}
 
 			log("connect called");

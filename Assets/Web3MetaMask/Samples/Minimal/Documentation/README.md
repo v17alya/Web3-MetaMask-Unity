@@ -41,7 +41,29 @@ This sample demonstrates a minimal end-to-end setup of the Web3-MetaMask bridge 
       // REQUIRED: SDK options object containing dappMetadata and infuraAPIKey
       sdkOptions: {
         dappMetadata: { name: 'MetaMask Sample', url: window.location.href },
-        infuraAPIKey: 'YOUR_INFURA_KEY'
+        infuraAPIKey: 'YOUR_INFURA_KEY',
+
+        ...(function() {
+          // Check if device is iOS
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+          
+          if (!isIOS) {
+            return {
+              openDeeplink: (link) => {
+                console.log('[MetaMaskBridge] openDeeplink called with:', link);
+                
+                // Open the deeplink
+                try {
+                  window.open(link, '_blank');
+                } catch (e) {
+                  console.error('[MetaMaskBridge] Failed to open deeplink:', e);
+                }
+              }
+            };
+          }
+          return {};
+        })(),
       }
     });
   </script>
