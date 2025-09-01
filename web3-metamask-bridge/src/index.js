@@ -298,8 +298,8 @@ import { MetaMaskSDK } from "@metamask/sdk";
 	 * @returns {boolean}
 	 */
 	function isConnected() {
-		return getProvider()?.isConnected();
-		// return Boolean(lastAddress);
+		// return getProvider()?.isConnected();
+		return Boolean(lastAddress);
 	}
 
 	/**
